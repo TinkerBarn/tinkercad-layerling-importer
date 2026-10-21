@@ -1,29 +1,27 @@
-# Publishing notes
+# Publish a release
 
-## Build a source snapshot
+GitHub Pages serves the static installer; GitHub Releases stores the offline and source ZIPs. There is no application server. Installed bookmarks contain their own code and must be replaced to update.
 
-From the repository directory:
+## Prepare
 
-```sh
-python tinkercad-import/convert.py --self-test
-node --test tinkercad-import/test_exporter.cjs
-python tools/package_release.py
-```
+1. Update `VERSION`, `CHANGELOG.md` and compatibility evidence. Use a new version for every published change.
+2. Run the CONTRIBUTING checks, commit the generated HTML with its sources, and push. Wait for the **Tests** workflow to pass for that exact commit on Windows and Linux.
+3. From GitHub Actions, run **Release**, choose **prepare**, and enter the matching tag, for example `v0.2.0`. Run it from the reviewed main revision.
+4. Inspect the resulting draft release, both ZIPs and external `SHA256SUMS`. Preparation creates the version tag at the tested commit. Existing tags and releases are never overwritten.
 
-The package is written to `dist/tinkercad-layerling-importer.zip`. Its explicit file list excludes `.git`, `.local`, design captures, screenshots, generated projects, historical task diaries, and machine-specific diagnostics. The ZIP includes `SHA256SUMS` for its source files. Review its contents before sharing.
+The browser ZIP contains `index.html`, `LICENSE.txt` and `README.txt`; those same files form the hosted site. The source ZIP has an explicit allowlist and an internal file checksum manifest. No private fixtures or Git history are packaged.
 
-The archived development material remains in `.local/publication-archive-2026-10-21/`. It includes the previous repository instructions, environment details, test evidence, and helper scripts. Those helpers retain their historical assumptions and are not part of the supported public workflow.
+## Publish
 
-## Git history
+1. Ensure the source history, Actions logs and assets are suitable for public access. Pages availability depends on the repository visibility and account plan.
+2. Enable Pages using **GitHub Actions** in repository settings. Review the `github-pages` deployment environment restrictions.
+3. Run **Release** again with **publish** and the prepared tag. The workflow resolves the tag, requires successful tests for its commit, downloads the draft's exact assets, verifies hashes and source contents, publishes the preview release, and deploys the matching browser files.
+4. Check the HTTPS installer, versioned download, source and issue links. Record a real browser import and Layerling save/reopen result.
 
-Earlier commits in the original development checkout contain full design captures, generated projects, screenshots, and personal environment details. Removing those files from the current tree does not remove them from history. Do not push that development history to a public remote. Source ZIPs and the new source-only GitHub repository exclude it.
+Publication does not rebuild assets. A deployment failure can be retried with the same tag: an already published release is accepted only after its assets pass the same verification. Initial releases are marked as previews.
 
-A new repository initialized from the reviewed source ZIP avoids carrying that history; this is the approach used for the private GitHub repository. Alternatively, an explicitly authorized history rewrite can remove it; collaborators and existing clones would need coordination. The original development checkout and its remote remain unchanged.
+## Roll back hosting
 
-## Before a release
+Run **Release** with **rollback** and an earlier published tag. Its checksums and browser archive are checked before deploying. Published release assets and tags remain intact; the old installer tells users to replace their bookmark. Rollback does not update previously installed bookmarks.
 
-- Include the selected MIT license and confirm the right to distribute any additional code or fixtures.
-- Review the ZIP file list and checksum manifest.
-- Run the tests from an extracted copy without the local archive.
-- Check the exporter and converted output against the current Tinkercad and Layerling versions using a design cleared for sharing.
-- Describe compatibility limits and distinguish automated geometry checks from manual renderer checks.
+The workflow has one release/deployment concurrency group. Release writes require `contents: write`; Pages deployment uses `pages: write` and `id-token: write` with the `github-pages` environment. Tests have read access. Actions are pinned to commit revisions.

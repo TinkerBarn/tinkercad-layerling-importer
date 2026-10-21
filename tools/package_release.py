@@ -3,10 +3,17 @@
 import hashlib
 import zipfile
 from pathlib import Path
+from build_browser import main as build_browser
 
 
 ROOT = Path(__file__).resolve().parents[1]
 FILES = (
+    "VERSION",
+    "CHANGELOG.md",
+    ".github/ISSUE_TEMPLATE/bug.yml",
+    ".github/workflows/release.yml",
+    "tools/release.py",
+    "tools/test_release.py",
     ".gitattributes",
     ".gitignore",
     ".github/workflows/tests.yml",
@@ -15,18 +22,29 @@ FILES = (
     "LICENSE",
     "README.md",
     "docs/publishing.md",
+    "docs/browser-release-checks.md",
     "docs/plans/tinkercad-import-integration.md",
     "tinkercad-import/README.md",
     "tinkercad-import/bookmarklet.html",
+    "tinkercad-import/bookmarklet.template.html",
+    "tinkercad-import/browser-convert.js",
+    "tinkercad-import/browser-ui.js",
+    "tinkercad-import/browser-test-helpers.cjs",
     "tinkercad-import/convert.py",
+    "tinkercad-import/test_browser_converter.cjs",
     "tinkercad-import/test_converter.py",
     "tinkercad-import/test_exporter.cjs",
     "tinkercad-import/verify_geometry.py",
     "tools/package_release.py",
+    "tools/build_browser.py",
+    "tools/check_browser_parity.py",
+    "tools/convert_browser_fixtures.cjs",
+    "tools/check_release.py",
 )
 
 
 def main():
+    build_browser()
     paths = list(FILES)
     # Read all inputs before replacing a previous package.
     sources = {name: (ROOT / name).read_bytes() for name in paths}
@@ -41,6 +59,34 @@ def main():
             archive.writestr(name, data)
         archive.writestr("SHA256SUMS", checksums)
     print(f"Wrote {output} ({len(sources)} source files plus checksums)")
+    browser_files = {
+        "index.html": sources["tinkercad-import/bookmarklet.html"],
+        "LICENSE.txt": sources["LICENSE"],
+        "README.txt": (
+            "Tinkercad to layerling â€” browser edition\n\n"
+            "1. Extract this ZIP and open index.html in your browser.\n"
+            "2. Drag Export to layerling onto your bookmarks bar.\n"
+            "3. Open a design in the Tinkercad editor and click the bookmark.\n"
+            "   If the editor reloads, click the bookmark again when it is ready.\n"
+            "4. Wait for Project ready, then open the downloaded .lyl in layerling.\n"
+            "   Use Download .lyl again if the download did not start.\n\n"
+            "No Python, server, or extension is needed. Conversion stays in your browser.\n"
+            "To update, open the new index.html and replace the saved bookmark.\n"
+            "This is an unofficial tool using Tinkercad's undocumented editor tools.\n"
+        ).encode("utf-8"),
+    }
+    site = output.parent / "site"
+    site.mkdir(exist_ok=True)
+    for name, data in browser_files.items():
+        (site / name).write_bytes(data)
+    browser_output = output.parent / "tinkercad-layerling-browser.zip"
+    with zipfile.ZipFile(browser_output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, data in browser_files.items():
+            archive.writestr(name, data)
+    sums = "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+                   for path in (output, browser_output))
+    (output.parent / "SHA256SUMS").write_text(sums, encoding="utf-8", newline="\n")
+    print(f"Wrote {browser_output}, SHA256SUMS and static site at {site}")
 
 
 if __name__ == "__main__":

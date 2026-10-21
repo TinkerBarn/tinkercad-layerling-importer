@@ -1,64 +1,30 @@
-# Tinkercad to Layerling importer
+# Tinkercad to Layerling
 
-Capture an open Tinkercad design and convert it into an editable Layerling `.lyl` project. The importer preserves evaluated triangle geometry, colors, grouping, visibility, and boolean operands.
+Convert the design open in Tinkercad into an editable Layerling `.lyl` project. No server, Python install, or browser extension is needed.
 
-Imported parts are editable meshes, not recovered parametric sketches. The exporter uses Tinkercad's undocumented testkit API, so compatibility can change. This project is an independent prototype and is not affiliated with Autodesk or Layerling.
-
-## Requirements
-
-- Python 3.10 or later; no Python packages required.
-- A desktop browser with access to your Tinkercad design. The exporter has been exercised in Chrome.
-- Layerling to open the converted project.
-- Node.js 22 or later to run the exporter tests; not needed for conversion.
+**[Open the installer](https://taylormadearmy.github.io/tinkercad-layerling-importer/)** · **[Download the offline browser edition](https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.0/tinkercad-layerling-browser.zip)**
 
 ## Use
 
-1. Download this repository and open [tinkercad-import/bookmarklet.html](tinkercad-import/bookmarklet.html) in your browser.
-2. Drag **Export to layerling** onto your bookmarks bar.
-3. Open your design in Tinkercad and click the bookmark. If the editor reloads to enable its tools, click it again after the design finishes loading.
-4. Convert the downloaded `tinkercad-design.json` using one of the commands below, from the repository directory.
-5. Open the resulting `.lyl` file in Layerling.
+1. Open the installer and drag **Export to layerling** onto your bookmarks bar. Show the bookmarks bar first if it is hidden.
+2. Open your design in the Tinkercad editor and click the saved bookmark. If the editor reloads, wait for the design to load and click it again.
+3. Wait for **Project ready**. If the download does not start, click **Download .lyl again** in the progress panel.
+4. Open the downloaded file in Layerling using **File → Open** or drop it onto the window.
 
-**PowerShell:**
+For offline installation, extract the browser ZIP and open `index.html`. To convert an earlier JSON capture, use **Convert an earlier JSON export** on the installer page.
 
-```powershell
-py tinkercad-import/convert.py "$env:USERPROFILE\Downloads\tinkercad-design.json" -o "$env:USERPROFILE\Downloads\MyDesign.lyl" --name MyDesign
-```
+To update, replace the saved bookmark from the new installer. Existing bookmarks keep their installed code.
 
-**Windows Command Prompt:**
+## What transfers
 
-```bat
-py tinkercad-import/convert.py "%USERPROFILE%\Downloads\tinkercad-design.json" -o "%USERPROFILE%\Downloads\MyDesign.lyl" --name MyDesign
-```
+Evaluated triangle geometry, colors, grouping, visibility, and boolean operands are retained. Parts are editable meshes; original parametric sketches are not recovered. Missing evaluated geometry stops conversion instead of producing a partial project. Large designs require available browser memory.
 
-**Linux or macOS:**
+Capture reads the open design without modifying it. Conversion stays in your browser; the importer does not upload designs. GitHub hosts the installer and has its own hosting logs. This unofficial preview uses Tinkercad's undocumented editor tools, which can change. It is not affiliated with Autodesk or Layerling.
 
-```sh
-python3 tinkercad-import/convert.py "$HOME/Downloads/tinkercad-design.json" -o "$HOME/Downloads/MyDesign.lyl" --name MyDesign
-```
+See [compatibility and checks](docs/browser-release-checks.md). Report problems through [GitHub Issues](https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml); include the version, browser, operating system and error. Do not attach a private design.
 
-The exporter reads the open design without changing its objects. Captures and conversion run locally; this tool does not upload your design. Opening the result in another application is a separate step.
+## Developers
 
-After updating the exporter, replace any saved bookmark: bookmarks contain a copy of the old script.
+Python 3.10+ and Node.js 22 are used for checks. Runtime conversion has no dependencies. See [CONTRIBUTING.md](CONTRIBUTING.md) for build and check commands, [the CLI guide](tinkercad-import/README.md) for optional Python conversion, and [publishing](docs/publishing.md) for releases.
 
-## Checks
-
-Run from the repository directory, using `py` or `python3` in place of `python` where needed:
-
-```sh
-python tinkercad-import/convert.py --self-test
-node --test tinkercad-import/test_exporter.cjs
-python tinkercad-import/verify_geometry.py path/to/capture.json path/to/design.lyl
-```
-
-The automated tests use synthetic data and need no accounts or private designs. Geometry verification compares a converted project's stored vertices with its capture; it does not prove that Layerling's current renderer displays them correctly.
-
-See [conversion details and troubleshooting](tinkercad-import/README.md), [contributing](CONTRIBUTING.md), and the [proposed native integration](docs/plans/tinkercad-import-integration.md).
-
-## Distribution
-
-`python tools/package_release.py` builds a source ZIP from an explicit file list, with SHA-256 checksums. It excludes captures, screenshots, generated projects, local diagnostics, and Git history. See [publishing notes](docs/publishing.md) before distributing the repository itself.
-
-## License
-
-The code is available under the [MIT License](LICENSE). Imported designs retain their own ownership and licensing.
+The project is licensed under [MIT](LICENSE).

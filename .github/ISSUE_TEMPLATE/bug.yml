@@ -1,0 +1,43 @@
+name: Import problem
+description: Report a capture, conversion or installation problem
+body:
+  - type: markdown
+    attributes:
+      value: Please do not attach private designs or captures. Start with the error text.
+  - type: input
+    id: version
+    attributes:
+      label: Importer version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where did it fail?
+      options:
+        - Installing the bookmark
+        - Capturing in Tinkercad
+        - Converting or downloading
+        - Opening or editing in Layerling
+        - Optional Python CLI
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Steps, expected result and error text
+    validations:
+      required: true

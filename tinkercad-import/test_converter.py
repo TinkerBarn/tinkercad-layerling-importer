@@ -20,6 +20,16 @@ def mesh(x=0):
 
 
 class ConverterTests(unittest.TestCase):
+    def test_reversed_winding_surfaces_are_not_duplicates(self):
+        for normals in (True, False):
+            a, b = mesh(), mesh()
+            b["positions"] = b["positions"][:3] + b["positions"][6:9] + b["positions"][3:6]
+            if not normals:
+                a.pop("normals"); b.pop("normals")
+            tree = [{"versions_id":"bundle", "dataType":"csg", "params":{"groupType":0}, "children":[leaf("a"),leaf("b")]}]
+            shapes, *_ = Converter({"a":a, "b":b}).convert(tree)
+            self.assertFalse(any(s.get("hidden") for s in shapes[0]["_children"]))
+
     def test_world_geometry_and_normals_round_trip(self):
         source = mesh(11.125)
         c = Converter({"part": source})

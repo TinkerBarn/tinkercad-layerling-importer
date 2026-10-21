@@ -1,21 +1,30 @@
 # Contributing
 
-The converter uses the Python standard library. The exporter and its tests use browser APIs and Node.js built-ins. There is no dependency installation step for the default checks.
+Use synthetic, shareable examples. Do not commit captured designs, generated `.lyl` files, screenshots of private designs, credentials, or local browser profiles.
 
-Run from the repository directory:
+## Build and check
+
+Install Python 3.10+ and Node.js 22. No package installation is required. Run from the repository root (use `py` or `python3` instead of `python` where needed):
 
 ```sh
+python tools/build_browser.py
 python tinkercad-import/convert.py --self-test
-node --test tinkercad-import/test_exporter.cjs
+node --test tinkercad-import/test_browser_converter.cjs tinkercad-import/test_exporter.cjs
+python tools/check_browser_parity.py
+python tools/package_release.py
+python tools/check_release.py
+python -m unittest discover -s tools -p "test_release.py"
 git diff --check
 ```
 
-Use Python 3.10+ and Node.js 22+. CI runs the checks on Windows and Linux. If you change geometry conversion, add a small synthetic case that exercises the affected behavior. If you change capture, test the production download path, including large numeric arrays.
+Edit the HTML template and browser modules, then rebuild the generated HTML. Commit both the source and generated page. CI checks freshness on Windows and Linux. The parity check compares browser output with the Python reference across synthetic assemblies; package checks rerun the portable checks from the extracted source ZIP.
 
-Keep source Tinkercad designs read-only. Preserve source positions, normals, hierarchy, and operand visibility. Do not replace missing geometry with inferred primitives or merge parts solely because their bounds match.
+For an optional local capture comparison, use `python tools/check_browser_parity.py --capture path/to/capture.json`. Keep that capture outside Git.
 
-Keep private design exports, generated `.lyl` files, screenshots, credentials, and machine-specific helpers under `.local/`, which is ignored. Tests must run without those files. Use synthetic or explicitly licensed fixtures for shared examples.
+## Report a problem
 
-When reporting a problem, include your OS, browser, Python version, the failing step, and the error text. Share a minimal reproduction you have permission to distribute. Captures can contain the complete design, including hidden objects; inspect them before sharing.
+Include the importer version, browser and version, operating system, failure stage and exact error. For CLI problems include the Python version. Start with the error text; provide a minimal shareable example only if needed. Do not include private design data in public issues.
 
-For manual browser testing, load the application before importing sensitive fixtures and block network requests and WebSockets before exposing their data to the page. Verify grouped display, Ungroup, source visibility, and save/reopen. Stored geometry checks alone do not verify renderer behavior.
+## Review changes
+
+Describe the observed problem, the change, and checks performed. Geometry changes should include a synthetic regression demonstrating the affected behavior. Preserve source objects and fail clearly when capture is incomplete. Browser-engine checks and Layerling open/save checks are separate from simulated DOM tests; describe which checks actually ran.

@@ -1,10 +1,10 @@
-# Integrate Tinkercad import into Layerling
+# Tinkercad importer: standalone roadmap
 
 ## Goal
 
 Make an existing Tinkercad design easy to bring into Layerling as an editable assembly, preserving its visible parts, names, colors, nesting, hole operands, and evaluated boolean geometry as closely as the source exposes them. The import must never write to or modify the Tinkercad design.
 
-Local prototype checks demonstrated per-node geometry preservation and Layerling save/reopen on a complex assembly. The private source fixtures and screenshots are excluded from this repository's public files. It remains a browser-assisted prototype: the capture relies on Tinkercad's internal testkit API, and the converter is currently Python rather than part of Layerling. This document is a proposal, not implemented native integration.
+The separate-tool approach was requested by the Layerling maintainer. The repository now has a self-contained browser bookmarklet that captures and writes a `.lyl` file locally, plus an offline page for converting earlier JSON captures. Python remains as a CLI reference. Browser output matches Python on synthetic assemblies and the archived development capture. A full browser matrix and Layerling open/save/reopen check remain outstanding.
 
 ## Integration options
 
@@ -16,35 +16,49 @@ Local prototype checks demonstrated per-node geometry preservation and Layerling
 | Paste a Tinkercad design URL into Layerling | Paste URL, Layerling fetches or captures the design | Potentially high only for public designs or authenticated browser handoff. | Private designs, login boundaries, CORS, session handling, and privacy make this a poor default; avoid asking Layerling's server to fetch user designs. |
 | Official Tinkercad API / first-party integration | Choose Layerling from Tinkercad's own export/share UI | Best possible if Autodesk provides a supported API/handoff. | No supported API/handoff has been established in this prototype; investigate before depending on it. |
 
-## Recommendation
+## Recommendation after maintainer feedback
 
-Ship a first-party Layerling import experience around the existing browser-assisted exporter, initially as a single downloaded package accepted by the existing import entry point. Keep ordinary STL/OBJ import as a clearly labeled fallback. Do not make URL fetching or a browser extension a prerequisite for the first release.
+Keep this as an independent, unofficial converter. The Layerling maintainer prefers not to put the undocumented Tinkercad capture API inside Layerling, where Autodesk changes would become a core product maintenance burden. The maintainer is open to linking a published standalone tool from Layerling's guide.
 
-The one-time exporter setup is an unavoidable friction point while Tinkercad exposes no supported direct handoff. Reduce it with a short, illustrated setup and then a repeatable two-action flow: **Tinkercad: Send to Layerling** → **Layerling: Open downloaded design**. If product research supports it later, a browser extension can replace bookmark installation without changing the package format or Layerling importer.
+The first implementation is a browser-only bookmarklet that captures the open Tinkercad design, converts it locally in JavaScript, and downloads a `.lyl` directly. Runtime needs no server, Python, Node install, or upload. The install page is a self-contained local HTML file; static GitHub Pages hosting can distribute the same page later without processing designs. The page can also convert earlier JSON exports. Keep ordinary Tinkercad OBJ/STL as another option when the internal capture stops working, with fidelity loss explained.
 
-## Proposed user experience
+This makes the returning-user flow one click: **open design in Tinkercad → click bookmark → open downloaded `.lyl` in Layerling**. First use adds one bookmark setup step. Start with desktop Chrome, Edge, and Firefox on Windows, macOS, and Linux; test Safari/macOS before claiming support. Mobile browsers are out of scope initially.
 
-### Entry points
+## Standalone distribution and implementation
 
-- Empty project: a prominent **Import from Tinkercad** action next to the existing open/import affordance.
-- Existing project: **File → Import → Tinkercad design…**; append the imported assembly to the current scene rather than replacing it.
-- Also accept drag-and-drop of the downloaded package and `.tinkercad.json`/supported package file through the existing dashboard and editor file picker.
+1. **Share one conversion contract.** The browser converter is a dependency-free JavaScript module in `tinkercad-import/browser-convert.js`; extraction stays in the install page and download stays in the bookmark entry. A small build script embeds the same source in the generated HTML and bookmarklet.
+2. **Keep the bookmark self-contained.** `tools/build_browser.py` generates the install page and `javascript:` link. The installed bookmark makes no network request and sends no design data anywhere; it uses Tinkercad's page context, creates the `.lyl` Blob, and downloads it. Users reinstall/update the bookmark after replacing the generated page.
+3. **Keep the source maintainable.** Keep readable source, synthetic tests, build script, generated bookmarklet page, and release notes in the standalone repository. CI rebuilds the distributable and checks that the generated output is current. The Python CLI remains useful as a parity oracle and optional local fallback.
+4. **Minimize browser permissions.** A bookmarklet asks for no extension permissions and runs only when the user clicks it on the Tinkercad page. Explain clearly that it is unofficial, reads the current design through an undocumented internal interface, performs conversion locally, and may stop working if Tinkercad changes. Users should be able to inspect the source before installing it.
+5. **Keep bookmarklet size under control.** The current generated link is self-contained, but its installed size and behavior still need checks in browsers we plan to support. If practical size or browser restrictions become a problem, keep the JSON-to-LYL page as the fallback. Static hosting still needs no running server, and model data stays in the browser. An extension is a later option only if bookmarklet limits materially hurt usability.
+6. **Avoid a desktop wrapper initially.** Electron/Tauri would create OS-specific installers, signing/update work, and a larger support surface without fixing the dependency on Tinkercad's in-page API. A browser bookmarklet is the most portable and low-maintenance first packaging format for desktop users.
+
+### Distribution choices
+
+| Choice | User experience | Maintenance / portability |
+| --- | --- | --- |
+| Self-contained bookmarklet that downloads `.lyl` | One click after bookmark setup; no intermediate JSON or terminal | Best fit. Static hosting only, same JavaScript across desktop OS/browser families. Build output size and browser differences need validation. |
+| Bookmarklet + static/offline converter page | Capture JSON, open/drop into converter, download `.lyl` | Easiest to debug and keeps the bookmarklet small. Extra handoff step; static hosting or a local HTML file, no runtime server. |
+| Browser extension | Toolbar click, auto-update, possibly smoother file handoff | Better polish if needed; store submissions, permissions, browser-specific builds, and ongoing compatibility work add cost. Reuse the same JS core. |
+| Native desktop app | App window and file handling | Highest packaging, signing, update, and OS maintenance. Not recommended for first release. |
+
+## User experience
 
 ### First use
 
-1. Layerling shows a short explanation: the design stays in the user's browser; no Tinkercad credentials are requested; this does not change the source design.
-2. Offer **Install exporter bookmark** with browser-specific drag/click directions and a **Use STL/OBJ instead** alternative.
-3. Explain that the user opens the design in Tinkercad and clicks the bookmark. If Tinkercad's editor reloads while enabling its capture runtime, show a simple retry cue.
-4. The bookmark captures and downloads a single import package. It should name the file after the design when known and show progress, captured object count, and a human-readable failure if evaluated geometry is missing.
-5. Returning to Layerling, the downloaded file opens the import review screen; confirm with **Import design**.
+1. Open the downloaded install page or the static HTTPS site. The page shows the tool version and local-conversion instructions.
+2. Drag **Export to layerling** to the browser's bookmarks bar.
+3. Open a design in Tinkercad and click the bookmark. If enabling the editor tools reloads the page, click again when the design is ready.
+4. Watch capture, conversion, and packaging progress. The completed project downloads as one `.lyl` named after the design.
+5. Open the `.lyl` through Layerling's existing project-open workflow.
 
-### Import review
+### Returning use and recovery
 
-- Preview the assembly and show design name, solids, groups, holes, mesh count/size, and any unsupported or degraded content.
-- Default to preserving Tinkercad visibility and hierarchy. Provide a small number of clear choices: **Keep source visibility** (default) or **Show all parts**; **Import into current design** or **Open as a new design**.
-- Make the geometry limitation explicit: imported shapes are editable meshes and group operands, not recovered native Tinkercad parametric sketches or Layerling analytic CAD features.
-- For very large files, report size and triangle count before committing; allow cancel without changing the current project.
-- On success, select the imported root, frame the assembly in view, and provide Undo. Keep hidden operands available in the outliner.
+- Open a design, click the saved bookmark, and open the downloaded project. Additional clicks during capture focus the existing progress panel.
+- If the automatic download is blocked, use **Download .lyl again**. The completed Blob stays available until the panel is closed or replaced.
+- Errors stay visible in the panel and produce no partial project. Close the panel and retry after the design finishes loading.
+- Earlier JSON captures can be converted from the same install page, including when that page is opened offline.
+- Updating the install page does not update existing bookmarks. Replace the saved bookmark to install the new code.
 
 ### Failure and fallback
 
@@ -53,62 +67,63 @@ The one-time exporter setup is an unavoidable friction point while Tinkercad exp
 - Oversized package: identify the limiting count/size and suggest exporting selected components or using native STL/OBJ for a flattened result.
 - STL/OBJ fallback should state that it may lose hierarchy, holes as editable operands, names, or per-part colors before import.
 
-## Architecture proposal
+## Standalone architecture
 
-1. **Stabilize the interchange contract.** Define a versioned package containing design metadata, the tree, and evaluated world-space triangle meshes keyed by stable source node IDs (`versions_id`). Include normals/material data when available, source visibility, units/coordinate convention, source/API version diagnostics, and content hashes. Validate archive paths, declared sizes, triangle counts, finite numeric values, and hashes before allocation/import.
-2. **Use a single package download.** The exporter should bundle the current JSON and mesh payloads into one `.tci`/`.tinkercad` ZIP so users do not manage sidecar files. Keep an optional JSON debug export for development only. Choose the extension after confirming it does not conflict with existing file associations.
-3. **Move conversion into Layerling.** Port the currently verified conversion behavior from `convert.py` to a typed TypeScript import module that produces the app's internal project/scene representation. Reuse the native mesh asset writer and scene/project validators rather than generating a `.lyl` ZIP with a second implementation. This avoids relying on private `.lyl` serialization details.
-4. **Integrate at the import boundary.** Add the package MIME/extension to the editor and dashboard file input/drop handlers and route it through the existing import dialog. Keep `.lyl` as open/replace and the Tinkercad package as scene import/append, with an explicit “open as new design” option.
-5. **Preserve source semantics deliberately.** Keep source hierarchy and bundle children. For boolean groups, retain the evaluated result mesh for correct appearance and keep editable operand nodes; hide cutters in normal rendering while retaining them for editing. Preserve exact source mesh geometry and source visibility. Detect coincident duplicate surfaces only with complete-geometry evidence and preserve duplicate source nodes hidden/editable when needed; do not snap or infer geometry.
-6. **Make work bounded and cancellable.** Parse/validate off the main thread where possible; stream or chunk mesh decoding; report progress; enforce documented per-file limits; cancel cleanly. Never send the model to a Layerling server or require Tinkercad credentials.
-7. **Keep a fallback.** Existing STL/OBJ routes remain unchanged and are offered when the enhanced capture is unavailable.
+1. **Capture boundary:** the exporter in `bookmarklet.template.html` reads the source tree and evaluated world meshes keyed by `versions_id`, including normals and source visibility. It owns the fragile Tinkercad API interaction.
+2. **Conversion boundary:** `browser-convert.js` validates the tree and meshes, changes coordinate axes, preserves hierarchy and operands, and writes the existing Layerling v2 document and hashed mesh assets. Missing geometry stops conversion.
+3. **Source semantics:** evaluated boolean meshes provide the displayed result; operands retain source visibility for editing and Ungroup. Duplicate suppression requires complete surface evidence, preserves winding and normals, and keeps suppressed nodes editable.
+4. **Download boundary:** `browser-ui.js` owns progress, one active capture per tab, filename handling, retained Blob URLs, and cleanup. Conversion does not send the model to a server.
+5. **Distribution:** `tools/build_browser.py` embeds the source into the install page. `tools/package_release.py` produces a browser-only ZIP, static-site folder, and allowlisted source ZIP. Generated-page freshness and package verification run in CI.
+6. **Compatibility evidence:** Python remains the reference writer. Differential checks compare project documents and exact binary assets; independent stored-geometry checks and manual Layerling/browser checks cover different boundaries.
 
 ## Delivery phases
 
-### Phase 0 — Design and compatibility spike
+### Phase 0 — Standalone prototype and compatibility spike (complete)
 
-- Confirm current Layerling import dialog, project/scene types, mesh asset insertion, undo transaction, and file-size safeguards.
+- Confirm `.lyl` archive details and current Layerling project/scene schema so the standalone writer stays compatible.
 - Verify which Tinkercad captures can be obtained without mutating the source and document browser/version prerequisites.
 - Use an assembly cleared for redistribution as a golden fixture; add small synthetic fixtures for a primitive, nested bundle, color group, subtraction, imported mesh, custom generator, hidden part, and incomplete capture.
-- Agree on package extension/schema and supported capture boundary with Layerling maintainers before implementation.
+- Confirm the standalone distribution approach with the maintainer; a supported Tinkercad file input would be a separate future route.
 
-### Phase 1 — Native package reader
+### Phase 1 — Browser conversion parity (in progress)
 
-- Implement package validation and the TypeScript conversion path behind a feature flag or isolated import handler.
-- Reuse geometry and serialization tests from the prototype, including exact per-vertex checks, node counts, save/reopen, invalid/missing mesh failures, and malicious archive boundaries.
-- Import to a new design first; keep append behind explicit review until undo/rollback and ID remapping are proven.
+- Port package validation and conversion into the browser JavaScript bundle; keep the Python implementation as a parity oracle during transition.
+- Reuse geometry and serialization checks from the prototype, including exact per-vertex checks, node counts, save/reopen, invalid/missing mesh failures, ambiguous identities, and ZIP output boundaries.
+- Download a `.lyl` that opens and saves through Layerling's ordinary project workflow.
 
-### Phase 2 — User-facing guided handoff
+Current state: the dependency-free writer matches Python's v2 document structure and exact mesh bytes on 18 synthetic assemblies and the archived development capture. Closed convex alternate triangulations are supported with consistent orientation. Stored geometry verification covers 537 meshes with zero measured vertex error. ZIP STORE, a progress panel, duplicate-click protection, and persistent download recovery are implemented. Independent Layerling open/save/reopen and cross-browser installation checks remain.
 
-- Add the entry points, one-time bookmark installation guidance, progress/error states, preview, visibility choice, and STL/OBJ fallback.
+### Phase 2 — Standalone release page and user workflow (partly complete)
+
+- Publish the static bookmarklet installation page, one-time setup guidance, progress/error states, and STL/OBJ fallback.
 - Localize strings and test keyboard, touch, and desktop-browser file handling.
 - Verify on a range of designs and supported browsers, beyond the original development fixture.
 
-### Phase 3 — Reduce handoff friction
+### Phase 3 — Optional distribution improvements
 
-- Evaluate a browser extension or Tinkercad-supported integration only after the package contract is stable and the bookmarklet workflow demonstrates demand.
-- Keep capture and Layerling package reader separate so changing the capture transport does not change import semantics.
+- Evaluate an extension only if real users find bookmark installation or execution limiting. Reuse the same capture/conversion modules.
+- Revisit first-party Layerling integration only if Autodesk provides a supported data route or the maintainer asks for it.
 
 ## Acceptance criteria
 
-- A first-time user can follow the in-product instructions without command line or Python, and a returning user can capture and import with two obvious actions.
+- A first-time desktop user can install the bookmark and follow instructions without command line or Python; a returning user needs one click in Tinkercad and then opens the downloaded `.lyl`.
 - The source Tinkercad design is read-only throughout capture.
-- Import is local; no design data or credentials leave the user's browser.
+- Conversion is local; no design data or credentials are sent to the converter publisher or Layerling.
 - A valid package opens with the full editable tree, expected visibility/colors, correct boolean results, and no guessed geometry; all source mesh positions match within exporter precision.
-- Cancel/failure leaves the current Layerling project untouched; undo removes a completed append as one action.
-- Large or malformed inputs fail with clear, actionable errors and bounded resource use.
-- A redistributable assembly and representative fixtures pass through Layerling's normal import path, save, close, and reopen.
+- A generated `.lyl` opens in Layerling, saves, closes, and reopens without geometry loss.
+- Large or malformed captures fail with clear, actionable errors and bounded resource use.
+- A redistributable assembly and representative fixtures pass through the browser converter and Layerling's normal open/save/reopen workflow.
 - The fallback tells users what STL/OBJ will discard.
 
 ## Open decisions
 
-- Which package extension and versioning policy fit Layerling conventions?
-- Is the first supported flow bookmarklet-only, or does the maintainer want an extension prototype too?
-- Should the default after capture open a fresh design or append to the current project? Recommended default: new design for safety, with append explicitly offered.
-- What mesh triangle/file limits and minimum supported browser versions match existing importer safeguards?
-- Which Tinkercad editor versions/browsers are within the supported compatibility promise, given the undocumented testkit API?
+- The standalone repository uses MIT; public publication still requires the source and redistribution review noted in `docs/publishing.md`.
+- Does a self-contained bookmarklet fit comfortably within Chrome, Edge, Firefox, and Safari bookmark behavior?
+- Which browsers and Tinkercad editor versions will be listed as tested, given the undocumented testkit API?
+- What mesh triangle/file limits keep conversion responsive on ordinary computers?
+- Should the Python CLI remain a supported alternative or become developer-only after JavaScript parity?
 
 ## Evidence and references
 
 - Prototype contract and source: [conversion details](../../tinkercad-import/README.md), [exporter](../../tinkercad-import/bookmarklet.html), and [converter](../../tinkercad-import/convert.py). Design-specific evidence remains in the ignored local archive.
-- Layerling's public repository currently documents ordinary imports for STL, OBJ, STEP, SVG, ZIP/3MF workflows and exposes an existing dashboard file picker; the integration should extend the native import boundary instead of asking users to run this prototype converter. See [Layerling README](https://github.com/henmedia/layerling) and [Layerling import entry point](https://github.com/henmedia/layerling/blob/main/apps/web/src/app/page.tsx).
+- The standalone handoff uses Layerling's ordinary `.lyl` project workflow. Background references for possible future integration are the [Layerling repository](https://github.com/henmedia/layerling) and its [web entry point](https://github.com/henmedia/layerling/blob/main/apps/web/src/app/page.tsx).

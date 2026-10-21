@@ -63,6 +63,7 @@ def same_convex_surface(first: list[float], second: list[float]) -> bool:
         unique = set(vertices)
         center = tuple(sum(v[i] for v in unique)/len(unique) for i in range(3))
         edges = Counter()
+        orientation = 0
         for j in range(0,len(vertices),3):
             p,q,r = vertices[j:j+3]
             u = tuple(q[i]-p[i] for i in range(3));v = tuple(r[i]-p[i] for i in range(3))
@@ -70,13 +71,18 @@ def same_convex_surface(first: list[float], second: list[float]) -> bool:
             length = math.sqrt(sum(x*x for x in n))
             if length<1e-12:continue
             n = tuple(x/length for x in n)
-            if sum(n[i]*(center[i]-p[i]) for i in range(3))>0:n=tuple(-x for x in n)
+            side = sum(n[i]*(center[i]-p[i]) for i in range(3))
+            winding = -1 if side > 1e-12 else 1 if side < -1e-12 else 0
+            if not winding or (orientation and orientation != winding): return 0
+            orientation = winding
+            if side > 0: n=tuple(-x for x in n)
             if any(sum(n[i]*(x[i]-p[i]) for i in range(3))>1e-4 for x in unique):return False
             for x,y in ((p,q),(q,r),(r,p)):
                 edge=tuple(sorted((tuple(round(c,4) for c in x),tuple(round(c,4) for c in y))))
                 edges[edge]+=1
-        return bool(edges) and all(count==2 for count in edges.values())
-    return convex_closed(a) and convex_closed(b)
+        return orientation if edges and all(count==2 for count in edges.values()) else 0
+    first_orientation = convex_closed(a)
+    return first_orientation != 0 and first_orientation == convex_closed(b)
 
 
 class Converter:
@@ -146,7 +152,7 @@ class Converter:
                 if shape.get("hidden") or shape.get("hole"):
                     return
                 if shape.get("_meshRef"):
-                    mesh = self.meshes.get(shape["id"])
+                    mesh = self.meshes.get(shape["_sourceId"])
                     if mesh and mesh.get("space") == "world":
                         p = mesh["positions"]
                         normal = mesh.get("normals") or []
@@ -157,7 +163,7 @@ class Converter:
                             triangles = []
                             for i in range(0, len(values), 9):
                                 vertices = [tuple(values[j:j+3]) + tuple(normals[j:j+3]) for j in range(i,i+9,3)]
-                                triangles.append(tuple(sorted(vertices)))
+                                triangles.append(min(tuple(vertices[k:] + vertices[:k]) for k in range(3)))
                             return sorted(triangles)
                         for candidate in candidates:
                             previous, previous_normals, previous_bounds, previous_shape = candidate
@@ -426,6 +432,7 @@ class Converter:
 
     def _base(self, node: dict, name: str, kind: str, color: str, width: float, depth: float, height: float, x: float, z: float, elevation: float, hole: bool) -> dict:
         shape = {
+            "_sourceId": str(node.get("versions_id") or name),
             "id": self.unique_id(str(node.get("versions_id") or name)),
             "name": str(name)[:80] or "Shape",
             "kind": kind,
@@ -484,9 +491,9 @@ def encode_mesh(positions: list[float], normals: list[float] | None = None) -> b
     validate_mesh(positions,normals)
     blob = bytearray(b"LYLMSH1\0")
     blob += struct.pack("<II", len(positions), len(normals) if normals is not None else 0)
-    blob += struct.pack("<" + "d" * len(positions), *positions)
+    blob += struct.pack("<" + "d" * len(positions), *(v if v else 0.0 for v in positions))
     if normals:
-        blob += struct.pack("<" + "d" * len(normals), *normals)
+        blob += struct.pack("<" + "d" * len(normals), *(v if v else 0.0 for v in normals))
     return bytes(blob)
 
 
