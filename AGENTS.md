@@ -15,7 +15,7 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
-Version 0.2.1 preview prepared after a successful 0.2.0 package build exposed a draft-release lookup failure during publication.
+Version 0.2.1 preview published with HTTPS Pages hosting. Windows/Linux CI, exact release asset checks and hosted delivery checks pass. See docs/browser-release-checks.md for the limited Chrome verification.
 
 ## Findings
 
@@ -26,3 +26,5 @@ The REST release-by-tag endpoint does not resolve unpublished drafts. Resolve dr
 ## TODO
 
 Record additional browser compatibility results as they are tested.
+
+Complete independent live-editor capture, real-browser JSON conversion and Layerling save/reopen checks before expanding support claims.
