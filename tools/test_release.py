@@ -10,6 +10,14 @@ import release
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_draft_lookup_uses_release_id_not_published_tag_endpoint(self):
+        with patch.object(release, "gh", return_value='{"databaseId":123}') as cli:
+            with patch.object(release, "api", return_value={"draft": True}) as api:
+                self.assertTrue(release.release_for("v0.2.1")["draft"])
+                api.assert_called_once_with("releases/123")
+                cli.assert_called_once_with("release", "view", "v0.2.1", "--repo",
+                                            release.REPOSITORY, "--json", "databaseId")
+
     def test_tag_validation(self):
         self.assertEqual(release.version_for("v0.2.0"), "0.2.0")
         for value in ("main", "v0.2.0/../../x", "v0.2.0\n", "v1.2.3;whoami"):

@@ -2,7 +2,7 @@
 
 ## Support level
 
-Version 0.2.0 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
+Version 0.2.1 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
 
 The bookmark uses modern JavaScript, Web Crypto, Blob downloads and Tinkercad's undocumented editor tools. Browser policies can block bookmark installation, console pasting or automatic downloads. A persistent download link is provided when automatic download does not start. Large designs depend on available memory.
 

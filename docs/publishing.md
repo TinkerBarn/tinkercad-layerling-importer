@@ -6,7 +6,7 @@ GitHub Pages serves the static installer; GitHub Releases stores the offline and
 
 1. Update `VERSION`, `CHANGELOG.md` and compatibility evidence. Use a new version for every published change.
 2. Run the CONTRIBUTING checks, commit the generated HTML with its sources, and push. Wait for the **Tests** workflow to pass for that exact commit on Windows and Linux.
-3. From GitHub Actions, run **Release**, choose **prepare**, and enter the matching tag, for example `v0.2.0`. Run it from the reviewed main revision.
+3. From GitHub Actions, run **Release**, choose **prepare**, and enter the matching tag, for example `v0.2.1`. Run it from the reviewed main revision.
 4. Inspect the resulting draft release, both ZIPs and external `SHA256SUMS`. Preparation creates the version tag at the tested commit. Existing tags and releases are never overwritten.
 
 The browser ZIP contains `index.html`, `LICENSE.txt` and `README.txt`; those same files form the hosted site. The source ZIP has an explicit allowlist and an internal file checksum manifest. No private fixtures or Git history are packaged.

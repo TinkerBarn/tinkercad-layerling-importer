@@ -2,7 +2,7 @@
 
 Convert the design open in Tinkercad into an editable Layerling `.lyl` project. No server, Python install, or browser extension is needed.
 
-**[Open the installer](https://taylormadearmy.github.io/tinkercad-layerling-importer/)** · **[Download the offline browser edition](https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.0/tinkercad-layerling-browser.zip)**
+**[Open the installer](https://taylormadearmy.github.io/tinkercad-layerling-importer/)** · **[Download the offline browser edition](https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.1/tinkercad-layerling-browser.zip)**
 
 ## Use
 

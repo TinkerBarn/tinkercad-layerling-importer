@@ -27,6 +27,13 @@ def api(path):
     return json.loads(gh("api", f"repos/{REPOSITORY}/{path}"))
 
 
+def release_for(tag):
+    # GitHub's REST by-tag endpoint returns published releases only. The CLI
+    # resolves authorized drafts too; fetch the full asset metadata by its ID.
+    identity = json.loads(gh("release", "view", tag, "--repo", REPOSITORY, "--json", "databaseId"))
+    return api("releases/" + str(int(identity["databaseId"])))
+
+
 def version_for(tag):
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
         raise ValueError("Tag must be v followed by major.minor.patch")
@@ -134,7 +141,7 @@ def stage(tag, *, rollback=False):
         if commit != run("git", "rev-parse", "HEAD"):
             raise ValueError("Checkout must match the exact release tag")
         require_tests(commit)
-    release = api(f"releases/tags/{tag}")
+    release = release_for(tag)
     if rollback and release["draft"]:
         raise ValueError("Rollback requires a published release")
     names = [asset["name"] for asset in release["assets"]]

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — Preview
+
+- Resolve draft releases by ID during publication, with a regression for the failed lookup.
+- First public hosted preview. The 0.2.0 candidate was retained as an unpublished draft.
+
+Replace your saved bookmark to install this version.
+
 ## 0.2.0 — Preview
 
 - Capture and convert directly to `.lyl` from a Tinkercad bookmark.

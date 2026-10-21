@@ -15,11 +15,13 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
-Version 0.2.0 preview prepared for standalone distribution.
+Version 0.2.1 preview prepared after a successful 0.2.0 package build exposed a draft-release lookup failure during publication.
 
 ## Findings
 
 Tinkercad capture depends on undocumented editor tools. Imported geometry is editable mesh geometry, not recovered sketches. Browser and Python writers must preserve the same evaluated surfaces.
+
+The REST release-by-tag endpoint does not resolve unpublished drafts. Resolve drafts through the CLI, then request asset metadata by release ID.
 
 ## TODO
 
