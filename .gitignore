@@ -1,0 +1,14 @@
+# Private captures, generated projects, and machine-specific diagnostics.
+/.local/
+/dist/
+*.lyl
+tinkercad-design*.json
+tinkercad-import/verification/
+
+# Local runtimes and caches.
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db

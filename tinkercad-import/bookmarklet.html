@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tinkercad to layerling</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; padding: 0 1rem; color: #1c1c1c; }
+  a.mark { display: inline-block; background: #1473e6; color: white; text-decoration: none; padding: 0.5rem 0.9rem; border-radius: 6px; }
+  button { font: inherit; padding: 0.4rem 0.8rem; }
+  code { background: #f2f2f2; padding: 0.1rem 0.3rem; }
+  ol li { margin: 0.4rem 0; }
+</style>
+</head>
+<body>
+<h1>Tinkercad to layerling</h1>
+<ol>
+  <li>Open the design in the Tinkercad editor.</li>
+  <li>Drag this link to the bookmarks bar: <a class="mark" id="mark" href="#">Export to layerling</a></li>
+  <li>Click the bookmark. If the editor tools need enabling, the page reloads; click it again when the design is ready. The browser downloads <code>tinkercad-design.json</code>, including evaluated geometry and available surface normals for every part and boolean group. Missing geometry stops the export.</li>
+  <li>Turn the file into a project: <code>python3 convert.py tinkercad-design.json -o design.lyl</code></li>
+  <li>Open <code>design.lyl</code> in layerling (File → Open, or drop it on the window).</li>
+</ol>
+<p>If a bookmark is awkward, copy the same script and paste it into the editor’s console.</p>
+<p><button id="copy" type="button">Copy console script</button> <span id="copied"></span></p>
+<p>When you are finished, run <code>TinkerPower.delete("testkit")</code> in that console to turn the editor tools back off.</p>
+<script id="exporter">
+function* tinkercadJsonChunks(value) {
+  if (Array.isArray(value)) {
+    yield "[";
+    if (value.every(item => typeof item === "number")) {
+      for (let i = 0; i < value.length; i += 8192) {
+        if (i) yield ",";
+        yield JSON.stringify(value.slice(i, i + 8192)).slice(1, -1);
+      }
+    } else {
+      for (let i = 0; i < value.length; i++) {
+        if (i) yield ",";
+        yield* tinkercadJsonChunks(value[i] === undefined ? null : value[i]);
+      }
+    }
+    yield "]";
+  } else if (value !== null && typeof value === "object") {
+    yield "{";
+    let first = true;
+    for (const [key, item] of Object.entries(value)) {
+      if (item === undefined) continue;
+      if (!first) yield ",";
+      first = false;
+      yield JSON.stringify(key) + ":";
+      yield* tinkercadJsonChunks(item);
+    }
+    yield "}";
+  } else {
+    yield JSON.stringify(value);
+  }
+}
+
+async function tinkercadJsonBlob(value) {
+  const blobs = [];
+  let pending = [], length = 0;
+  for (const chunk of tinkercadJsonChunks(value)) {
+    pending.push(chunk);
+    length += chunk.length;
+    if (length >= 65536) {
+      blobs.push(new Blob(pending));
+      pending = [];
+      length = 0;
+      if (blobs.length % 16 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+  if (pending.length) blobs.push(new Blob(pending));
+  return new Blob(blobs, {type:"application/json"});
+}
+
+async function exportTinkercadDesign({download = true} = {}) {
+  const tools = window.llm?.tools?.get_design_data;
+  if (typeof testKit === "undefined" || !tools) {
+    if (window.TinkerPower?.enable) {
+      TinkerPower.enable("testkit");
+      location.reload();
+      return;
+    }
+    throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
+  }
+  const result = await tools.run({includeScreenshot: false});
+  const payload = result?.content?.[0]?.json || result?.json || result;
+  const shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
+  if (!shapes) throw new Error("Tinkercad did not return a shape tree.");
+  const sceneNodes = new Map(), seen = new Set();
+  function visit(node) {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    const id = node.data?.versions_id || node.versions_id;
+    if (id) sceneNodes.set(String(id), node);
+    const children = node.children;
+    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child);
+  }
+  visit(testKit.sceneModel);
+  const meshes = {}, meshParts = [], diagnostics = [], failures = [], ids = new Set();
+  // Encode each mesh while it is captured. Download mode retains Blob data,
+  // rather than every expanded numeric array and a second giant JSON string.
+  const shapeBlob = download ? await tinkercadJsonBlob(shapes) : null;
+  async function capture(node) {
+    if (node.tags?.preview) return;
+    const id = String(node.versions_id || "");
+    if (!id || ids.has(id)) throw new Error("Missing or repeated shape identity: " + id);
+    ids.add(id);
+    const bundle = node.dataType === "csg" && node.params?.groupType === 0;
+    if (!bundle) {
+      const sn = sceneNodes.get(id);
+      try {
+        if (!sn?.computeWorldMatrix) throw new Error("Missing scene node/world transform");
+        let geometry = sn.geometry?.get?.();
+        if (!geometry) {
+          await Promise.race([
+            new Promise((resolve, reject) => { try { sn.evaluate(resolve); } catch (e) { reject(e); } }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Geometry evaluation timed out")), 20000))
+          ]);
+          geometry = sn.geometry?.get?.();
+        }
+        if (!geometry?.attributes?.position) throw new Error("Missing evaluated geometry");
+        // applyMatrix4 transforms normals with the inverse transpose, including nonuniform scale.
+        const matrix = sn.computeWorldMatrix();
+        let world = geometry.clone().applyMatrix4(matrix);
+        if (world.index) { const indexed = world; world = world.toNonIndexed(); indexed.dispose(); }
+        const expand = attribute => {
+          const values = [];
+          for (let i=0; i<attribute.count; i++) values.push(attribute.getX(i),attribute.getY(i),attribute.getZ(i));
+          return values;
+        };
+        const positions = expand(world.attributes.position);
+        const normals = world.attributes.normal ? expand(world.attributes.normal) : undefined;
+        // A reflected transform reverses winding. Keep outward normals and front faces consistent.
+        if (matrix.determinant() < 0) {
+          for (let i = 0; i < positions.length; i += 9) {
+            for (let axis = 0; axis < 3; axis++) {
+              [positions[i+3+axis], positions[i+6+axis]] = [positions[i+6+axis], positions[i+3+axis]];
+              if (normals) [normals[i+3+axis], normals[i+6+axis]] = [normals[i+6+axis], normals[i+3+axis]];
+            }
+          }
+        }
+        world.dispose();
+        if (!positions.length || positions.length % 9 || !positions.every(Number.isFinite)) throw new Error("Invalid triangle positions");
+        if (normals && (normals.length !== positions.length || !normals.every(Number.isFinite))) throw new Error("Invalid normals");
+        const mesh = {positions, normals, space:"world", csg:node.dataType === "csg"};
+        if (download) {
+          if (meshParts.length) meshParts.push(",");
+          meshParts.push(JSON.stringify(id) + ":", await tinkercadJsonBlob(mesh));
+        } else {
+          meshes[id] = mesh;
+        }
+        diagnostics.push({id, triangles:positions.length / 9});
+      } catch (error) { failures.push({id, message:String(error.message || error)}); }
+    }
+    for (const child of node.children || []) await capture(child);
+  }
+  for (const node of shapes) await capture(node);
+  if (failures.length) throw new Error("Incomplete export (" + failures.length + " failures); no file downloaded. First failures: " + JSON.stringify(failures.slice(0, 20)));
+  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
+  if (download) {
+    const blob = new Blob([
+      '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
+      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), '}'
+    ], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = "tinkercad-design.json"; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    alert("Exported " + diagnostics.length + " evaluated shapes and groups. No source geometry changed.");
+    return {format:exported.format, shapeCount:shapes.length, meshCount:diagnostics.length, byteLength:blob.size};
+  }
+  return exported;
+}
+</script>
+<script>
+  const source = document.getElementById("exporter").textContent.trim() + '\nexportTinkercadDesign().catch(error => { console.error("Tinkercad export failed:", error); alert("Export failed: " + error.message); });';
+  document.getElementById("mark").href = "javascript:" + encodeURI(source);
+  document.getElementById("copy").addEventListener("click", async () => {
+    await navigator.clipboard.writeText(source);
+    document.getElementById("copied").textContent = "Copied. Paste it in the Tinkercad console.";
+  });
+</script>
+</body>
+</html>
