@@ -91,7 +91,8 @@ def main():
             archive.writestr(name, data)
     sums = "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
                    for path in (output, browser_output))
-    (output.parent / "SHA256SUMS").write_text(sums, encoding="utf-8", newline="\n")
+    with (output.parent / "SHA256SUMS").open("w", encoding="utf-8", newline="\n") as checksums_file:
+        checksums_file.write(sums)
     print(f"Wrote {browser_output}, SHA256SUMS and static site at {site}")
 
 

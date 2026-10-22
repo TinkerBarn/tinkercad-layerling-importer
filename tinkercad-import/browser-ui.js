@@ -117,8 +117,16 @@
         });
         if (session.disposed) return;
         releaseDownload = setDownload(view.link, blob, name);
+        const skipped = capture.failures || [];
+        const warning = skipped.length
+          ? " " +
+            skipped.length +
+            " shape(s) or group(s) were skipped because Tinkercad could not evaluate their geometry."
+          : "";
         progress(
-          "Project ready. Open the downloaded .lyl in layerling. If the download did not start, use the link below.",
+          "Project ready." +
+            warning +
+            " Open the downloaded .lyl in layerling. If the download did not start, use the link below.",
         );
         try {
           view.link.click();

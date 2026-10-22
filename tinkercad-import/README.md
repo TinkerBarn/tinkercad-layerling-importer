@@ -43,7 +43,7 @@ Each triangle uses nine position values. The exporter handles indexed geometry b
 
 **A path containing `$env:USERPROFILE` fails:** that syntax belongs to PowerShell. Windows Command Prompt uses `%USERPROFILE%`. Provide an absolute path if your shell does not expand the example.
 
-**Missing geometry:** wait for the design to finish loading and export again. A repeated failure may indicate a Tinkercad API change or unsupported scene state. Do not remove the error check to produce a partial project.
+**Some geometry cannot be evaluated:** the browser importer skips failed shapes and failed Boolean groups with their operands, then downloads the remaining project and reports how many items were skipped. The resulting project is partial. Wait for the design to finish loading and export again if you need those items. A repeated failure may indicate a Tinkercad API change or unsupported scene state. If no meshes can be captured, no project is produced.
 
 **Faceted outlines on curved parts:** generated projects enable Layerling's standard outline mode. In the tested reader, automatic mesh outlines used a 14-degree crease cutoff while standard outlines used 25 degrees. Changing workspace display settings can make source tessellation more visible.
 

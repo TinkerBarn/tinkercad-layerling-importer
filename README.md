@@ -27,7 +27,7 @@ To update, replace the saved bookmark from the new installer. Existing bookmarks
 
 ## What transfers
 
-Evaluated triangle geometry, colors, grouping, visibility, and boolean operands are retained. Parts are editable meshes; original parametric sketches are not recovered. Missing evaluated geometry stops conversion instead of producing a partial project. Large designs require available browser memory.
+Evaluated triangle geometry, colors, grouping, visibility, and boolean operands are retained. Parts are editable meshes; original parametric sketches are not recovered. If Tinkercad cannot evaluate a few shapes, the importer skips those shapes (and any failed Boolean group’s operands) and downloads the remaining project with a warning. If no geometry can be evaluated, no project is created. Large designs require available browser memory.
 
 Capture reads the open design without modifying it. Conversion stays in your browser; the importer does not upload designs. GitHub hosts the installer and has its own hosting logs. This unofficial preview uses Tinkercad's undocumented editor tools, which can change. It is not affiliated with Autodesk or Layerling.
 

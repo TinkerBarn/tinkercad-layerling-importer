@@ -24,7 +24,9 @@ def main():
     # Escape closing script tags before embedding source in HTML.
     escape = lambda source: re.sub(r"</script", lambda match: "<\\/" + match.group()[2:], source, flags=re.IGNORECASE)
     output = template.replace(MARKER, escape(converter)).replace("/* IMPORTER_SOURCE */", escape(importer))
-    OUTPUT.write_text(output, encoding="utf-8", newline="\n")
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    with OUTPUT.open("w", encoding="utf-8", newline="\n") as page:
+        page.write(output)
     source = converter + "\n" + template.split('<script id="exporter">', 1)[1].split("</script>", 1)[0].strip() + "\n" + importer + "\nvoid runLayerlingImport();"
     from urllib.parse import quote
     length = len("javascript:" + quote(source, safe="~!*'()-._"))

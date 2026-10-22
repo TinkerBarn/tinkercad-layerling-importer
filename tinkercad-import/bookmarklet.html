@@ -55,12 +55,12 @@
 </ul>
 </details>
 <details><summary>Updates, privacy and limits</summary>
-<p>Version 0.2.2 preview. To update an older bookmark, drag the button onto your bar again, then remove the old bookmark so you know which one to use. Already installed bookmarks do not update themselves.</p>
+<p>Version 0.2.3 preview. To update an older bookmark, drag the button onto your bar again, then remove the old bookmark so you know which one to use. Already installed bookmarks do not update themselves.</p>
 <p>Your design is converted in your browser and is not uploaded by this tool. GitHub hosts this page and has its own hosting logs.</p>
 <p>Imported parts are editable meshes: you can move, resize and recolor them, but their original sketch settings are not recovered. This unofficial tool relies on Tinkercad editor features that can change. Large designs may need more memory.</p>
 <p>The shortcuts above explain how to show each browser’s bar; they do not mean the importer has been tested in every browser. See <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/blob/main/docs/browser-release-checks.md">compatibility and tested configurations</a>.</p>
 </details>
-<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.2/tinkercad-layerling-browser.zip">Download the offline edition</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer">Source and instructions</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml">Report a problem</a></p>
+<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.3/tinkercad-layerling-browser.zip">Download the offline edition</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer">Source and instructions</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml">Report a problem</a></p>
 <details><summary>Convert an earlier JSON export</summary>
 <p>This optional section is for designs you have already saved as a JSON export using this tool. For a design open in Tinkercad, use the bookmark steps above.</p>
 <p><label>Exported JSON <input id="source-file" type="file" accept="application/json,.json"></label></p>
@@ -150,13 +150,13 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
   let captured = 0;
   // Encode each mesh while it is captured. Download mode retains Blob data,
   // rather than every expanded numeric array and a second giant JSON string.
-  const shapeBlob = download ? await tinkercadJsonBlob(shapes) : null;
   async function capture(node) {
-    if (node.tags?.preview) return;
+    if (!node || node.tags?.preview) return null;
     const id = String(node.versions_id || "");
     if (!id || ids.has(id)) throw new Error("Missing or repeated shape identity: " + id);
     ids.add(id);
     const bundle = node.dataType === "csg" && node.params?.groupType === 0;
+    let failed = false;
     if (!bundle) {
       const sn = sceneNodes.get(id);
       let world;
@@ -205,28 +205,45 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
           meshes[id] = mesh;
         }
         diagnostics.push({id, triangles:positions.length / 9});
-      } catch (error) { failures.push({id, message:String(error.message || error)}); }
+      } catch (error) {
+        failed = true;
+        failures.push({id, message:String(error.message || error)});
+      }
       finally { world?.dispose(); }
     }
-    for (const child of node.children || []) await capture(child);
+    // Drop a failed node and its subtree so a failed Boolean group does not
+    // turn its operands into misleading top-level solids or holes.
+    if (failed) return null;
+    const children = [];
+    for (const child of node.children || []) {
+      const capturedChild = await capture(child);
+      if (capturedChild) children.push(capturedChild);
+    }
     captured++;
     onProgress(`Capturing parts (${captured})…`);
     if (captured % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    return children.length === (node.children || []).length
+      ? node
+      : {...node, children};
   }
-  for (const node of shapes) await capture(node);
-  if (failures.length) throw new Error("Incomplete export (" + failures.length + " failures); no file downloaded. First failures: " + JSON.stringify(failures.slice(0, 20)));
-  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
+  const capturedShapes = [];
+  for (const node of shapes) {
+    const capturedNode = await capture(node);
+    if (capturedNode) capturedShapes.push(capturedNode);
+  }
+  if (!diagnostics.length) throw new Error("No evaluated geometry could be exported. First failures: " + JSON.stringify(failures.slice(0, 20)));
+  const exported = {format:"tinkercad-evaluated-world-v1", shapes:capturedShapes, meshes, diagnostics, failures};
   if (download) {
     const blob = new Blob([
-      '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
-      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), '}'
+      '{"format":"tinkercad-evaluated-world-v1","shapes":', await tinkercadJsonBlob(capturedShapes),
+      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), ',"failures":', await tinkercadJsonBlob(failures), '}'
     ], {type:"application/json"});
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url; link.download = "tinkercad-design.json"; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    alert("Exported " + diagnostics.length + " evaluated shapes and groups. No source geometry changed.");
-    return {format:exported.format, shapeCount:shapes.length, meshCount:diagnostics.length, byteLength:blob.size};
+    alert("Exported " + diagnostics.length + " evaluated shapes and groups" + (failures.length ? "; skipped " + failures.length + " failed shapes/groups." : ".") + " No source geometry changed.");
+    return {format:exported.format, shapeCount:capturedShapes.length, meshCount:diagnostics.length, skippedCount:failures.length, byteLength:blob.size};
   }
   return exported;
 }
@@ -1035,8 +1052,16 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
         });
         if (session.disposed) return;
         releaseDownload = setDownload(view.link, blob, name);
+        const skipped = capture.failures || [];
+        const warning = skipped.length
+          ? " " +
+            skipped.length +
+            " shape(s) or group(s) were skipped because Tinkercad could not evaluate their geometry."
+          : "";
         progress(
-          "Project ready. Open the downloaded .lyl in layerling. If the download did not start, use the link below.",
+          "Project ready." +
+            warning +
+            " Open the downloaded .lyl in layerling. If the download did not start, use the link below.",
         );
         try {
           view.link.click();

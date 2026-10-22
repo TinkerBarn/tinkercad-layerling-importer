@@ -15,6 +15,8 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
+The browser exporter now tolerates per-shape geometry evaluation failures: it omits failed shapes and failed Boolean groups with their operands, then allows successful geometry to convert. The UI reports skipped items; no project is produced if every evaluated mesh fails. Source designs remain unchanged.
+
 Version 0.2.2 instructions published: one-time setup, bookmarks-bar shortcuts, drag instructions, per-design export, download location and common problems. Windows/Linux CI and release deployment passed. Real Chrome JSON conversion and download retry passed; four meshes match the source with zero measured vertex error. Export code is unchanged.
 
 Version 0.2.1 preview published with HTTPS Pages hosting. Windows/Linux CI, exact release asset checks and hosted delivery checks pass. See docs/browser-release-checks.md for the limited Chrome verification.

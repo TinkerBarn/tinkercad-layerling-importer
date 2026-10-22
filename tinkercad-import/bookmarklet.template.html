@@ -150,13 +150,13 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
   let captured = 0;
   // Encode each mesh while it is captured. Download mode retains Blob data,
   // rather than every expanded numeric array and a second giant JSON string.
-  const shapeBlob = download ? await tinkercadJsonBlob(shapes) : null;
   async function capture(node) {
-    if (node.tags?.preview) return;
+    if (!node || node.tags?.preview) return null;
     const id = String(node.versions_id || "");
     if (!id || ids.has(id)) throw new Error("Missing or repeated shape identity: " + id);
     ids.add(id);
     const bundle = node.dataType === "csg" && node.params?.groupType === 0;
+    let failed = false;
     if (!bundle) {
       const sn = sceneNodes.get(id);
       let world;
@@ -205,28 +205,45 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
           meshes[id] = mesh;
         }
         diagnostics.push({id, triangles:positions.length / 9});
-      } catch (error) { failures.push({id, message:String(error.message || error)}); }
+      } catch (error) {
+        failed = true;
+        failures.push({id, message:String(error.message || error)});
+      }
       finally { world?.dispose(); }
     }
-    for (const child of node.children || []) await capture(child);
+    // Drop a failed node and its subtree so a failed Boolean group does not
+    // turn its operands into misleading top-level solids or holes.
+    if (failed) return null;
+    const children = [];
+    for (const child of node.children || []) {
+      const capturedChild = await capture(child);
+      if (capturedChild) children.push(capturedChild);
+    }
     captured++;
     onProgress(`Capturing parts (${captured})…`);
     if (captured % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+    return children.length === (node.children || []).length
+      ? node
+      : {...node, children};
   }
-  for (const node of shapes) await capture(node);
-  if (failures.length) throw new Error("Incomplete export (" + failures.length + " failures); no file downloaded. First failures: " + JSON.stringify(failures.slice(0, 20)));
-  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
+  const capturedShapes = [];
+  for (const node of shapes) {
+    const capturedNode = await capture(node);
+    if (capturedNode) capturedShapes.push(capturedNode);
+  }
+  if (!diagnostics.length) throw new Error("No evaluated geometry could be exported. First failures: " + JSON.stringify(failures.slice(0, 20)));
+  const exported = {format:"tinkercad-evaluated-world-v1", shapes:capturedShapes, meshes, diagnostics, failures};
   if (download) {
     const blob = new Blob([
-      '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
-      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), '}'
+      '{"format":"tinkercad-evaluated-world-v1","shapes":', await tinkercadJsonBlob(capturedShapes),
+      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), ',"failures":', await tinkercadJsonBlob(failures), '}'
     ], {type:"application/json"});
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url; link.download = "tinkercad-design.json"; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    alert("Exported " + diagnostics.length + " evaluated shapes and groups. No source geometry changed.");
-    return {format:exported.format, shapeCount:shapes.length, meshCount:diagnostics.length, byteLength:blob.size};
+    alert("Exported " + diagnostics.length + " evaluated shapes and groups" + (failures.length ? "; skipped " + failures.length + " failed shapes/groups." : ".") + " No source geometry changed.");
+    return {format:exported.format, shapeCount:capturedShapes.length, meshCount:diagnostics.length, skippedCount:failures.length, byteLength:blob.size};
   }
   return exported;
 }

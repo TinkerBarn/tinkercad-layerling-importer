@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 — Continue export when some geometry fails
+
+- Export the evaluated shapes that Tinkercad can provide when another shape times out or fails.
+- Skip a failed Boolean group together with its operands to avoid exporting misleading loose solids or holes.
+- Warn in the export panel and installer download for partial projects; fail only when no geometry was captured.
+
 ## 0.2.2 — Clearer instructions
 
 - Explain how to show the bookmarks bar on Windows, Linux and Mac.
