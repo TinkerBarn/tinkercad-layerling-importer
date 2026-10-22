@@ -15,7 +15,7 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
-Version 0.2.2 instructions prepared: one-time setup, bookmarks-bar shortcuts, drag instructions, per-design export, download location and common problems. Export code is unchanged.
+Version 0.2.2 instructions published: one-time setup, bookmarks-bar shortcuts, drag instructions, per-design export, download location and common problems. Windows/Linux CI and release deployment passed. Real Chrome JSON conversion and download retry passed; four meshes match the source with zero measured vertex error. Export code is unchanged.
 
 Version 0.2.1 preview published with HTTPS Pages hosting. Windows/Linux CI, exact release asset checks and hosted delivery checks pass. See docs/browser-release-checks.md for the limited Chrome verification.
 
@@ -29,8 +29,6 @@ The REST release-by-tag endpoint does not resolve unpublished drafts. Resolve dr
 
 ## TODO
 
-Publish the 0.2.2 instruction update after its release checks pass.
-
 Record additional browser compatibility results as they are tested.
 
-Complete independent live-editor capture, real-browser JSON conversion and Layerling save/reopen checks before expanding support claims.
+Complete independent live-editor capture and Layerling open/Ungroup/save/reopen checks before expanding support claims. Layerling's file picker was not exposed by the automation environment.

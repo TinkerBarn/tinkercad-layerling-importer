@@ -29,6 +29,16 @@ Bookmark installation and capture from the live Tinkercad editor, JSON file conv
 
 ## Manual release checklist
 
+### 22 October 2026 — v0.2.2 instruction update
+
+The instruction update passed all four CI combinations and its release and Pages deployment completed. Public HTTPS checks verified both ZIP hashes and equality of all three site files with the offline ZIP.
+
+Chrome 155 on Windows displayed the revised setup steps. The optional JSON converter accepted a synthetic assembly, completed conversion, downloaded its `.lyl`, and downloaded a second copy through the retry link. Independent verification of the actual browser download checked four stored meshes and five nodes with zero measured vertex error. The exporter and conversion code are unchanged from v0.2.1.
+
+Layerling open, Ungroup, save and reopen remain independently unverified: the browser automation environment did not expose Layerling's file picker. These checks are still required before claiming the full editing round trip. Live Tinkercad bookmark installation/capture and other browser configurations also remain unverified.
+
+### Checklist
+
 Record browser/version, OS, date and result for each completed check:
 
 - Install the bookmark from the hosted HTTPS page.
