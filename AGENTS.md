@@ -15,15 +15,21 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
+Version 0.2.2 instructions prepared: one-time setup, bookmarks-bar shortcuts, drag instructions, per-design export, download location and common problems. Export code is unchanged.
+
 Version 0.2.1 preview published with HTTPS Pages hosting. Windows/Linux CI, exact release asset checks and hosted delivery checks pass. See docs/browser-release-checks.md for the limited Chrome verification.
 
 ## Findings
+
+User-facing setup should explain browser actions without mentioning developer tools or installation dependencies. Keep optional JSON and console paths collapsed.
 
 Tinkercad capture depends on undocumented editor tools. Imported geometry is editable mesh geometry, not recovered sketches. Browser and Python writers must preserve the same evaluated surfaces.
 
 The REST release-by-tag endpoint does not resolve unpublished drafts. Resolve drafts through the CLI, then request asset metadata by release ID.
 
 ## TODO
+
+Publish the 0.2.2 instruction update after its release checks pass.
 
 Record additional browser compatibility results as they are tested.
 

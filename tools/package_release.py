@@ -63,14 +63,20 @@ def main():
         "index.html": sources["tinkercad-import/bookmarklet.html"],
         "LICENSE.txt": sources["LICENSE"],
         "README.txt": (
-            "Tinkercad to layerling â€” browser edition\n\n"
+            "Tinkercad to layerling - offline edition\n\n"
             "1. Extract this ZIP and open index.html in your browser.\n"
-            "2. Drag Export to layerling onto your bookmarks bar.\n"
+            "2. Show the bookmarks bar, below your browser's address bar.\n"
+            "   Chrome, Edge or Firefox: Ctrl+Shift+B on Windows/Linux;\n"
+            "   Command+Shift+B on Mac. Safari: View > Show Favorites Bar.\n"
+            "   Skip this if the bar is already visible.\n"
+            "   Click and hold Export to layerling, drag it onto that bar, and let go.\n"
             "3. Open a design in the Tinkercad editor and click the bookmark.\n"
             "   If the editor reloads, click the bookmark again when it is ready.\n"
             "4. Wait for Project ready, then open the downloaded .lyl in layerling.\n"
             "   Use Download .lyl again if the download did not start.\n\n"
-            "No Python, server, or extension is needed. Conversion stays in your browser.\n"
+            "The file is usually in Downloads. On layerling's start page choose\n"
+            "Open a design or import geometry and select that .lyl file.\n\n"
+            "Conversion stays in your browser. Your Tinkercad design stays unchanged.\n"
             "To update, open the new index.html and replace the saved bookmark.\n"
             "This is an unofficial tool using Tinkercad's undocumented editor tools.\n"
         ).encode("utf-8"),

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2 — Clearer instructions
+
+- Explain how to show the bookmarks bar on Windows, Linux and Mac.
+- Separate one-time bookmark setup from exporting each design.
+- Explain dragging the button, the first-use reload, download retry and opening the file in layerling.
+- Move technical options and compatibility details into expandable sections.
+
+The export code is unchanged. Existing v0.2.1 bookmarks can keep being used.
+
 ## 0.2.1 — Preview
 
 - Resolve draft releases by ID during publication, with a regression for the failed lookup.

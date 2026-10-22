@@ -10,26 +10,64 @@
   button { font: inherit; padding: 0.4rem 0.8rem; }
   code { background: #f2f2f2; padding: 0.1rem 0.3rem; }
   ol li { margin: 0.4rem 0; }
+  table { border-collapse: collapse; margin: 0.6rem 0; width: 100%; }
+  th, td { text-align: left; padding: 0.4rem; border-bottom: 1px solid #ddd; }
+  kbd { font: inherit; font-weight: 600; white-space: nowrap; }
+  details { margin: 1rem 0; }
+  summary { cursor: pointer; font-weight: 600; }
 </style>
 </head>
 <body>
 <h1>Tinkercad to layerling</h1>
-<p>Version 0.2.1 preview · Local conversion · No server or Python required</p>
-<p>Replace your saved bookmark after installing an update.</p>
+<p>Bring your Tinkercad design into layerling so you can keep editing it.</p>
+<p>Use a computer for these steps. Your original Tinkercad design stays unchanged.</p>
+<h2>Set up once</h2>
 <ol>
-  <li>Open the design in the Tinkercad editor.</li>
-  <li>Drag this link to the bookmarks bar: <a class="mark" id="mark" href="#">Export to layerling</a></li>
-  <li>Click the bookmark. If the editor tools need enabling, the page reloads; click it again when the design is ready. It captures the evaluated design and downloads a Layerling <code>.lyl</code> file. Missing geometry stops the export.</li>
-  <li>Open the downloaded <code>.lyl</code> in layerling (File → Open, or drop it on the window).</li>
+  <li><strong>Show your bookmarks bar.</strong> This is the strip of saved website links just below the address bar. If you cannot see it, use the instructions below.
+    <table>
+      <thead><tr><th>Browser</th><th>Windows / Linux</th><th>Mac</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://support.google.com/chrome/answer/157179">Chrome</a>, <a href="https://support.microsoft.com/en-us/edge/keyboard-shortcuts-in-microsoft-edge">Edge</a> or <a href="https://support.mozilla.org/en-US/kb/keyboard-shortcuts-perform-firefox-tasks-quickly">Firefox</a></td><td><kbd>Ctrl + Shift + B</kbd></td><td><kbd>⌘ + Shift + B</kbd></td></tr>
+        <tr><td><a href="https://support.apple.com/guide/safari/ibrwde09262e/mac">Safari</a></td><td>—</td><td>Choose <strong>View → Show Favorites Bar</strong></td></tr>
+      </tbody>
+    </table>
+    Hold the keys down together. If the bar is already visible, skip this step.
+  </li>
+  <li><strong>Save the export button.</strong> Click and hold the blue button below, drag it up onto that bar, then let go. A new bookmark called <strong>Export to layerling</strong> should appear there.
+    <p><a class="mark" id="mark" href="#">Export to layerling</a></p>
+    Drag this button; clicking it on this page will not export a design.
+  </li>
 </ol>
-<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.1/tinkercad-layerling-browser.zip">Download the offline edition</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer">Source and instructions</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml">Report a problem</a></p>
-<p>Design capture and conversion stay in your browser. GitHub hosts this page and has its own hosting logs. Imported parts are editable meshes, not recovered sketches. This unofficial preview uses undocumented Tinkercad editor tools; large designs require available memory.</p>
-<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/blob/main/docs/browser-release-checks.md">Compatibility and tested configurations</a></p>
-<h2>Convert an earlier JSON export</h2>
+<h2>Export a design</h2>
+<ol>
+  <li><strong>Open your design in Tinkercad.</strong> Click <strong>Edit</strong> if you are looking at its preview page. Wait until you can see the design in the editor.</li>
+  <li><strong>Click the saved Export to layerling bookmark</strong> on your browser’s bar. If Tinkercad reloads the first time, wait for your design to reappear, then click the bookmark again.</li>
+  <li><strong>Wait for “Project ready.”</strong> Your browser downloads a file ending in <code>.lyl</code>, usually into your <strong>Downloads</strong> folder. If nothing downloads, click <strong>Download .lyl again</strong> in the small export panel.</li>
+  <li><strong>Open the file in layerling.</strong> On <a href="https://layerling.com/" target="_blank" rel="noopener">layerling’s start page</a>, click <strong>Open a design or import geometry</strong> and choose the downloaded <code>.lyl</code> file. You can also drag the file into the layerling window.</li>
+</ol>
+<p>For your next design, repeat only the steps under <strong>Export a design</strong>.</p>
+<details><summary>Something not working?</summary>
+<ul>
+  <li><strong>The saved bookmark is missing:</strong> show the bookmarks bar again using the shortcuts above. If the bar has a menu at its right-hand end, check there for bookmarks that do not fit.</li>
+  <li><strong>Clicking the bookmark asks you to open Tinkercad:</strong> switch to the tab containing your design’s editor, then click the saved bookmark there.</li>
+  <li><strong>The export shows an error:</strong> wait until the design has finished loading, close the export panel and try the bookmark again. If it still fails, use <strong>Report a problem</strong> below and include the error text.</li>
+  <li><strong>The file is missing:</strong> look in your Downloads folder, or use <strong>Download .lyl again</strong> while the export panel is still open.</li>
+</ul>
+</details>
+<details><summary>Updates, privacy and limits</summary>
+<p>Version 0.2.2 preview. To update an older bookmark, drag the button onto your bar again, then remove the old bookmark so you know which one to use. Already installed bookmarks do not update themselves.</p>
+<p>Your design is converted in your browser and is not uploaded by this tool. GitHub hosts this page and has its own hosting logs.</p>
+<p>Imported parts are editable meshes: you can move, resize and recolor them, but their original sketch settings are not recovered. This unofficial tool relies on Tinkercad editor features that can change. Large designs may need more memory.</p>
+<p>The shortcuts above explain how to show each browser’s bar; they do not mean the importer has been tested in every browser. See <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/blob/main/docs/browser-release-checks.md">compatibility and tested configurations</a>.</p>
+</details>
+<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.2/tinkercad-layerling-browser.zip">Download the offline edition</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer">Source and instructions</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml">Report a problem</a></p>
+<details><summary>Convert an earlier JSON export</summary>
+<p>This optional section is for designs you have already saved as a JSON export using this tool. For a design open in Tinkercad, use the bookmark steps above.</p>
 <p><label>Exported JSON <input id="source-file" type="file" accept="application/json,.json"></label></p>
 <p><label>Project name <input id="project-name" value="Tinkercad design"></label></p>
 <p><button id="convert" type="button">Convert to layerling</button> <span id="status" role="status" aria-live="polite"></span></p>
 <p><a id="download" hidden>Download .lyl again</a></p>
+</details>
 <details><summary>Advanced troubleshooting</summary>
 <p>If a bookmark is awkward, copy the script and paste it into the editor’s console. For a JSON troubleshooting export, run <code>exportTinkercadDesign()</code> in the console after the bookmark has run.</p>
 <p><button id="copy" type="button">Copy console script</button> <span id="copied"></span></p>
