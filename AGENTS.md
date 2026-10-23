@@ -209,6 +209,9 @@ Previous local verification recorded 84 checks, exact eager/lazy geometry parity
 
 ### TODO
 - [x] Complete portable and package checks: 84 checks pass; 18 synthetic assemblies match exact eager/lazy mesh bytes; extracted source/browser bundles pass integrity and allowlist checks.
-- Commit and push the source-only changes; require successful Windows/Linux CI.
-- Prepare and audit the draft assets, publish, deploy and verify hosted files.
+- [x] Source-only commit 3c4ca79 pushed to origin/main; all four Windows/Linux Python 3.10/3.13 jobs passed (run 39935613414).
+- [x] Draft preparation 39935837415 and publication/Pages deployment 39935921949 succeeded. v0.2.3 preview is public; all 35 packaged source files match the tagged commit, both public ZIP hashes pass, and all five HTTPS site files match the exact browser ZIP. HTTPS enforcement is enabled.
 - Complete the remaining live browser and Layerling checks separately without broadening support claims.
+
+### Published result
+Version 0.2.3 was published and deployed on 23 October 2026 from 3c4ca79b606c5dbc40cd052f9e6afb16b7fc73c7. Public release: https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/tag/v0.2.3 . Installer: https://taylormadearmy.github.io/tinkercad-layerling-importer/ . Installed self-contained bookmarks require replacement. Supporting runtime and version metadata are now public; authenticated-editor loader/update behavior and Layerling editing round-trip checks remain outstanding. No source design was modified.
