@@ -1,5 +1,6 @@
 """Check source ZIP contents, hashes, and portable checks from an extracted copy."""
 import hashlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -29,9 +30,11 @@ def main():
         ):
             subprocess.run(command, cwd=folder, check=True)
     with zipfile.ZipFile(ROOT / "dist/tinkercad-layerling-browser.zip") as archive:
-        assert archive.namelist() == ["index.html", "LICENSE.txt", "README.txt"]
+        assert archive.namelist() == ["index.html", "importer.js", "version.json", "LICENSE.txt", "README.txt"]
         assert archive.testzip() is None
         assert archive.read("index.html") == (ROOT / "tinkercad-import/bookmarklet.html").read_bytes()
+        assert archive.read("importer.js") == (ROOT / "tinkercad-import/importer.js").read_bytes()
+        assert json.loads(archive.read("version.json")) == {"version":(ROOT / "VERSION").read_text().strip()}
     print("Source and browser bundles verified; portable checks pass from the extracted source ZIP")
 
 

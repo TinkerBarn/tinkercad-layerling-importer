@@ -33,11 +33,11 @@ The bookmarklet captures a JSON object internally and converts it to a Layerling
 - `meshes`: per-node evaluated meshes keyed by `versions_id`, each with `space: "world"`, flat triangle `positions`, and optional `normals`.
 - `diagnostics`: capture metadata for troubleshooting.
 
-Each triangle uses nine position values. The exporter handles indexed geometry before capture. The browser converter writes a Layerling version 2 project ZIP containing `project.json` and hashed mesh assets. It uses uncompressed ZIP entries to avoid a runtime library, so `.lyl` files can be larger than those from Python's compressed ZIP. The Python converter remains available as a command-line alternative.
+Each triangle uses nine position values. The exporter handles indexed geometry before capture. The browser converter writes a Layerling version 2 project ZIP containing `project.json` and hashed mesh assets. It compresses mesh assets losslessly with the browser's native DEFLATE support, falling back to uncompressed ZIP entries when that support is unavailable. The Python converter remains available as a command-line alternative.
 
 ## Troubleshooting
 
-**`RangeError: Invalid string length` while exporting JSON:** replace the saved bookmark with the current version. Diagnostic JSON exports serialize numeric arrays in bounded chunks. Direct `.lyl` conversion retains captured geometry in memory, so very large designs can still exceed available browser memory.
+**`RangeError: Invalid string length` while exporting JSON:** replace the saved bookmark with the current version. Diagnostic JSON exports serialize numeric arrays in bounded chunks. Direct `.lyl` export reads meshes on demand into packed Float64 buffers and compresses each unique asset before moving on. It does not collect all expanded meshes first. Surface comparisons may reread candidate meshes. Tinkercad's scene, the current meshes and the compressed output still need memory; a very large individual mesh or output can still exceed available memory. JSON file conversion still loads its input in full. Wait until export finishes before editing the source design.
 
 **Nothing downloaded:** keep the progress panel open and click **Download .lyl again** when the project is ready. Closing the panel releases its download. Clicking the bookmark after completion starts a fresh capture; clicking while it is busy keeps the current capture.
 
@@ -56,3 +56,21 @@ Each triangle uses nine position values. The exporter handles indexed geometry b
 `python tools/check_browser_parity.py` compares the shipped browser converter with Python on synthetic assemblies, checking project structure, exact mesh bytes, hashes, and ZIP CRCs. Add `--capture path/to/capture.json` for a local assembly. See the [review record and manual compatibility checklist](../docs/browser-release-checks.md).
 
 Manual checks should include grouped appearance, Ungroup, hole visibility, and save/reopen in Layerling. The local development archive contains prior design-specific evidence; it is excluded from distribution. No universal compatibility promise is made for future Tinkercad APIs, Layerling readers, materials, or file sizes.
+
+
+## Large designs and updates (local preview)
+
+The export panel shows its version, a part-count percentage, the current stage and elapsed time. Large projects offer **Export smaller assemblies** or **Keep one project**. Smaller assemblies arrive in one ZIP; extract it and open a numbered `.lyl`. Each original top-level construction group stays intact, including hidden operands. Original workspace coordinates and mesh bytes are preserved. The default targets are 100 MiB of expanded unique meshes, one million referenced triangles and 1,500 nodes per project. These are grouping targets, not guarantees of file size, renderer memory or editing performance. Individual complete groups can exceed them; the panel and `assemblies.json` flag such cases.
+
+Layerling's current source includes **Insert design** in its Import panel. This adds a saved project's bodies to the open project with fresh identities and preserves their positions. Open one assembly, then use Import → Insert design for another; opening another project instead replaces the open project. This path has been inspected in source but not independently verified in the live UI. Adding every assembly recreates the original geometry load.
+
+The panel requests a small public version file without design data, credentials or a referrer. When a newer version is available, **Run latest version** loads it for that run after the current export finishes. It does not change a saved self-contained bookmark. The optional experimental **online** bookmark loads the hosted exporter on every run, avoiding future bookmark replacement after a one-time installation. Both requests can be blocked by editor policies or fail offline; the self-contained bookmark remains available. Online runtime files must be published before this local preview can work against the public site.
+
+
+### Layerling reader limits and preservation files
+
+The reader currently checks 512 MiB of compressed project data, 1 GiB expanded, 256 MiB per asset, 64 MiB for project.json, 4,096 archive entries, 100,000 nodes per state, 5,001 states, 300,000 features and 30 million numbers per mesh array. These limits were checked against [Layerling's reader source](https://github.com/henmedia/layerling/blob/c629f0a67542ad6bf5e2be644231355cfb34ef99/apps/web/src/lib/lylProject.ts) on 23 October 2026.
+
+The converter checks final project metadata and archive bytes, not just the grouping targets. It subdivides groups of independent roots further if needed. A construction root that cannot fit is retained under `needs-attention/` as a `.preserved-project.zip`, with the exact failing limits recorded in `assemblies.json`. It is **not ready to open in Layerling**; renaming it does not change its size or expansion limit. A reader limit change or a change to construction structure is required. No operands are discarded or flattened. The transport ZIP may exceed the per-project limit: extract it and open individual `.lyl` files.
+
+Passing these checks establishes compliance with the known file/count limits, not acceptable editing performance or a completed live import. The optional saved-JSON converter also has a File layout choice for assembly exports.

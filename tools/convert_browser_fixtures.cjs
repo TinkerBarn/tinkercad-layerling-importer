@@ -17,6 +17,8 @@ async function main() {
   const source = html.match(/<script id="converter">([\s\S]*?)<\/script>/)[1];
   const context = vm.createContext({
     Blob,
+    CompressionStream,
+    Float64Array,
     TextEncoder,
     crypto: webcrypto,
     setTimeout,
@@ -31,6 +33,16 @@ async function main() {
       path.join(output, fixture.name + ".lyl"),
       Buffer.from(await blob.arrayBuffer()),
     );
+    const lazy = await context.convertTinkercadToLayerling({
+      ...fixture.input,
+      meshes: {},
+      readMesh: async id => {
+        const mesh = fixture.input.meshes[id];
+        return mesh && {...mesh, positions: new Float64Array(mesh.positions),
+          normals: mesh.normals == null ? mesh.normals : new Float64Array(mesh.normals)};
+      },
+    }, fixture.name);
+    fs.writeFileSync(path.join(output, fixture.name + "-lazy.lyl"), Buffer.from(await lazy.arrayBuffer()));
   }
 }
 main().catch((error) => {

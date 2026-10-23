@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.3 — Preview — 23 October 2026
+
+- Observe Promise-based, callback-based and asynchronous geometry evaluation.
+- Stop on the first capture failure with the affected part's name and identity.
+- Allow cancellation during capture, large-mesh expansion, JSON encoding, conversion and packaging; keep the progress panel scrollable.
+- Report captured parts and triangle counts; show parts-converted percentage, a stage-aware progress bar and elapsed time without predicting remaining time.
+- Compress project downloads losslessly using browser compression when available, with an uncompressed fallback.
+- Read direct-export meshes on demand, use packed Float64 capture buffers, and compress each unique asset before reading the next mesh. Duplicate comparisons retain metadata instead of every raw mesh and signature.
+- Explain Layerling's large-group colour-display limit and a possible Ungroup workaround.
+- Save bounded local diagnostic checkpoints and offer reports for handled failures as well as interrupted exports. Reports exclude design geometry, names and share links.
+- Allow up to two minutes for an individual geometry evaluation, show elapsed waiting time and record evaluator completion signals. Do not repeat evaluation while waiting.
+- Read only conversion-required scene metadata for direct exports when the editor getter contract is available, retaining the full part hierarchy.
+- Expand indexed geometry without a second Three.js geometry allocation and write converted mesh bytes without intermediate coordinate arrays.
+
+- Offer complete-assembly projects for large designs, with original placement, intact operands, size-target warnings and one ZIP download.
+- Enforce Layerling reader file/count limits, split independent roots further when necessary, and preserve indivisible over-limit constructions separately instead of labelling them ready to open.
+- Offer assembly output for the saved-JSON converter and distinguish the transport ZIP from individual project files.
+- Show the installed version, check public version metadata, and provide an experimental permanent online loader alongside the self-contained bookmark.
+
+User-reported live exports succeeded, including a large design. Final bookmark installation, online-loader compatibility and Layerling Open/Insert/Ungroup/save/reopen remain unverified. Replace the self-contained bookmark to install this version; the experimental online bookmark requires access to the hosted runtime.
+
 ## 0.2.2 — Clearer instructions
 
 - Explain how to show the bookmarks bar on Windows, Linux and Mac.

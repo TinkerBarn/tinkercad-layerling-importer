@@ -39,6 +39,35 @@ class ReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     release.read_browser_zip(path)
 
+    def test_legacy_browser_archive_is_allowed_only_for_rollback(self):
+        with tempfile.TemporaryDirectory(dir=release.ROOT / "tinkercad-import") as directory:
+            path = Path(directory) / "legacy.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                for name in release.LEGACY_BROWSER_FILES:
+                    archive.writestr(name, name)
+            with self.assertRaises(ValueError):
+                release.read_browser_zip(path)
+            self.assertEqual(set(release.read_browser_zip(path, allow_legacy=True)), set(release.LEGACY_BROWSER_FILES))
+
+    def test_legacy_rollback_removes_new_runtime_and_version_files(self):
+        with tempfile.TemporaryDirectory(dir=release.ROOT / "tinkercad-import") as directory:
+            folder = Path(directory)
+            (folder / release.ASSETS[0]).write_bytes(b"legacy source")
+            with zipfile.ZipFile(folder / release.ASSETS[1], "w") as archive:
+                for name in release.LEGACY_BROWSER_FILES:
+                    archive.writestr(name, "Version 0.2.2" if name == "index.html" else name)
+            (folder / "SHA256SUMS").write_text("\n".join(
+                hashlib.sha256((folder/name).read_bytes()).hexdigest()+"  "+name for name in release.ASSETS))
+            site = folder / "dist/site"
+            site.mkdir(parents=True)
+            for name in release.BROWSER_FILES:
+                (site/name).write_bytes(b"newer content")
+            info = {"draft":False,"assets":[{"name":name} for name in (*release.ASSETS,"SHA256SUMS")]}
+            with patch.object(release,"ROOT",folder), patch.object(release,"tag_commit",return_value="old"), \
+                 patch.object(release,"release_for",return_value=info), patch.object(release,"download",return_value=folder):
+                release.stage("v0.2.2",rollback=True)
+            self.assertEqual({p.name for p in site.iterdir()},set(release.LEGACY_BROWSER_FILES))
+
     def test_checksum_coverage_and_corruption(self):
         with tempfile.TemporaryDirectory(dir=release.ROOT / "tinkercad-import") as directory:
             folder = Path(directory)

@@ -12,7 +12,8 @@ from package_release import FILES, ROOT
 
 REPOSITORY = "taylormadearmy/tinkercad-layerling-importer"
 ASSETS = ("tinkercad-layerling-importer.zip", "tinkercad-layerling-browser.zip")
-BROWSER_FILES = ("index.html", "LICENSE.txt", "README.txt")
+BROWSER_FILES = ("index.html", "importer.js", "version.json", "LICENSE.txt", "README.txt")
+LEGACY_BROWSER_FILES = ("index.html", "LICENSE.txt", "README.txt")
 
 
 def run(*args):
@@ -75,11 +76,14 @@ def verify_checksums(folder):
             raise ValueError(f"Checksum mismatch: {name}")
 
 
-def read_browser_zip(path):
+def read_browser_zip(path, *, allow_legacy=False):
     with zipfile.ZipFile(path) as archive:
-        if sorted(archive.namelist()) != sorted(BROWSER_FILES) or archive.testzip():
-            raise ValueError("Browser ZIP must contain exactly the three site files")
-        return {name: archive.read(name) for name in BROWSER_FILES}
+        allowed = [sorted(BROWSER_FILES)]
+        if allow_legacy:
+            allowed.append(sorted(LEGACY_BROWSER_FILES))
+        if sorted(archive.namelist()) not in allowed or archive.testzip():
+            raise ValueError("Browser ZIP must contain exactly the allowlisted site files")
+        return {name: archive.read(name) for name in archive.namelist()}
 
 
 def verify_assets(folder, *, compare_source=True):
@@ -98,6 +102,11 @@ def verify_assets(folder, *, compare_source=True):
                     raise ValueError(f"Release source differs from tagged commit: {name}")
         if browser["index.html"] != archive.read("tinkercad-import/bookmarklet.html"):
             raise ValueError("Browser and source installers differ")
+        if browser["importer.js"] != archive.read("tinkercad-import/importer.js"):
+            raise ValueError("Browser and source runtimes differ")
+        import json
+        if json.loads(browser["version.json"]) != {"version": archive.read("VERSION").decode().strip()}:
+            raise ValueError("Browser and source versions differ")
         if browser["LICENSE.txt"] != archive.read("LICENSE"):
             raise ValueError("Browser and source licenses differ")
     return browser
@@ -152,7 +161,7 @@ def stage(tag, *, rollback=False):
         # Older versions may have a different source allowlist. Hosting uses only
         # the strict browser archive after verifying both external ZIP digests.
         verify_checksums(folder)
-        browser = read_browser_zip(folder / ASSETS[1])
+        browser = read_browser_zip(folder / ASSETS[1], allow_legacy=True)
         if f"Version {version_for(tag)}".encode() not in browser["index.html"]:
             raise ValueError("Rollback installer version differs from tag")
     else:
@@ -161,6 +170,8 @@ def stage(tag, *, rollback=False):
     site.mkdir(parents=True, exist_ok=True)
     if any(item.name not in BROWSER_FILES for item in site.iterdir()):
         raise ValueError("Unexpected existing site file")
+    for name in set(BROWSER_FILES) - set(browser):
+        (site / name).unlink(missing_ok=True)
     for name, data in browser.items():
         (site / name).write_bytes(data)
     if not rollback and release["draft"]:

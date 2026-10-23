@@ -38,6 +38,10 @@
     Drag this button; clicking it on this page will not export a design.
   </li>
 </ol>
+<details><summary>Optional online bookmark: updates without replacing it</summary>
+<p>Experimental: drag <a class="mark" id="online-mark" href="{{ONLINE_BOOKMARK}}">Export to layerling (online)</a> to your bookmarks bar once. It loads the currently published exporter each time you use it. Internet access is required; Tinkercad may block external scripts. If it is blocked, use the self-contained blue bookmark above. This feature will become available after the supporting files are published.</p>
+<p>Both bookmarks convert locally. The online bookmark requests code from this project's static website without sending design data.</p>
+</details>
 <h2>Export a design</h2>
 <ol>
   <li><strong>Open your design in Tinkercad.</strong> Click <strong>Edit</strong> if you are looking at its preview page. Wait until you can see the design in the editor.</li>
@@ -46,17 +50,22 @@
   <li><strong>Open the file in layerling.</strong> On <a href="https://layerling.com/" target="_blank" rel="noopener">layerling’s start page</a>, click <strong>Open a design or import geometry</strong> and choose the downloaded <code>.lyl</code> file. You can also drag the file into the layerling window.</li>
 </ol>
 <p>For your next design, repeat only the steps under <strong>Export a design</strong>.</p>
+<p>Large designs offer <strong>Export smaller assemblies</strong> or <strong>Keep one project</strong>. The assemblies option downloads one ZIP: extract it, read README.txt, then open a numbered .lyl in layerling. Whole construction groups and original positions are retained. Files are checked against Layerling’s reader limits. An indivisible group that cannot fit is preserved in <code>needs-attention</code> as a <code>.preserved-project.zip</code>, not labelled as a ready-to-open project. Nothing is discarded. Extract the outer ZIP before opening a project; that transport ZIP may be larger than Layerling’s per-project limit. Combining separate projects in layerling has not yet been verified.</p>
 <details><summary>Something not working?</summary>
 <ul>
   <li><strong>The saved bookmark is missing:</strong> show the bookmarks bar again using the shortcuts above. If the bar has a menu at its right-hand end, check there for bookmarks that do not fit.</li>
   <li><strong>Clicking the bookmark asks you to open Tinkercad:</strong> switch to the tab containing your design’s editor, then click the saved bookmark there.</li>
-  <li><strong>The export shows an error:</strong> wait until the design has finished loading, close the export panel and try the bookmark again. If it still fails, use <strong>Report a problem</strong> below and include the error text.</li>
+  <li><strong>The export shows an error:</strong> wait until the design has finished loading, close the export panel and try the bookmark again. If it still fails, click <strong>Download failure report</strong> in the export panel, then use <strong>Report a problem</strong> below and include that report and the error text.</li>
   <li><strong>The file is missing:</strong> look in your Downloads folder, or use <strong>Download .lyl again</strong> while the export panel is still open.</li>
+  <li><strong>Chrome shows “Out of memory”:</strong> reload the Tinkercad tab, then click the bookmark again. If your browser saved progress information, the panel offers <strong>Download failure report</strong> before another export. Send that report with your problem report. It contains progress and memory estimates, not design geometry or share links.</li>
+  <li><strong>A detailed design appears as one colour in layerling:</strong> the colours may still be saved in the file. Layerling currently skips multicolour display for a grouped mesh above 300,000 triangles. Selecting the design and using <strong>Ungroup</strong> once may restore the colours by exposing smaller groups. Save a separate copy if you want to keep this change.</li>
 </ul>
 </details>
 <details><summary>Updates, privacy and limits</summary>
 <p>Version {{VERSION}} preview. To update an older bookmark, drag the button onto your bar again, then remove the old bookmark so you know which one to use. Already installed bookmarks do not update themselves.</p>
 <p>Your design is converted in your browser and is not uploaded by this tool. GitHub hosts this page and has its own hosting logs.</p>
+<p>The panel displays its version and checks this project’s static website for a newer published version. The check sends no design data. It may be unavailable offline or blocked by the editor. “Run latest version” loads the published code for this run; it does not replace a self-contained bookmark. Install the optional online bookmark once for future updates without dragging again.</p>
+<p>Small progress and memory records are saved in this browser to help diagnose interrupted exports. These records contain no design geometry, design names or share links.</p>
 <p>Imported parts are editable meshes: you can move, resize and recolor them, but their original sketch settings are not recovered. This unofficial tool relies on Tinkercad editor features that can change. Large designs may need more memory.</p>
 <p>The shortcuts above explain how to show each browser’s bar; they do not mean the importer has been tested in every browser. See <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/blob/main/docs/browser-release-checks.md">compatibility and tested configurations</a>.</p>
 </details>
@@ -65,6 +74,7 @@
 <p>This optional section is for designs you have already saved as a JSON export using this tool. For a design open in Tinkercad, use the bookmark steps above.</p>
 <p><label>Exported JSON <input id="source-file" type="file" accept="application/json,.json"></label></p>
 <p><label>Project name <input id="project-name" value="Tinkercad design"></label></p>
+<p><label>File layout <select id="export-mode"><option value="single">One project (reader limits checked)</option><option value="assemblies">Smaller assemblies in one ZIP</option></select></label></p>
 <p><button id="convert" type="button">Convert to layerling</button> <span id="status" role="status" aria-live="polite"></span></p>
 <p><a id="download" hidden>Download .lyl again</a></p>
 </details>
@@ -75,12 +85,12 @@
 </details>
 <script id="exporter">
 function* tinkercadJsonChunks(value) {
-  if (Array.isArray(value)) {
+  if (Array.isArray(value) || value instanceof Float64Array) {
     yield "[";
     if (value.every(item => typeof item === "number")) {
       for (let i = 0; i < value.length; i += 8192) {
         if (i) yield ",";
-        yield JSON.stringify(value.slice(i, i + 8192)).slice(1, -1);
+        yield JSON.stringify(Array.from(value.slice(i, i + 8192))).slice(1, -1);
       }
     } else {
       for (let i = 0; i < value.length; i++) {
@@ -105,10 +115,11 @@ function* tinkercadJsonChunks(value) {
   }
 }
 
-async function tinkercadJsonBlob(value) {
+async function tinkercadJsonBlob(value, checkCancelled = () => {}) {
   const blobs = [];
   let pending = [], length = 0;
   for (const chunk of tinkercadJsonChunks(value)) {
+    checkCancelled();
     pending.push(chunk);
     length += chunk.length;
     if (length >= 65536) {
@@ -118,11 +129,21 @@ async function tinkercadJsonBlob(value) {
       if (blobs.length % 16 === 0) await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
+  checkCancelled();
   if (pending.length) blobs.push(new Blob(pending));
   return new Blob(blobs, {type:"application/json"});
 }
 
-async function exportTinkercadDesign({download = true, onProgress = () => {}} = {}) {
+async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}} = {}) {
+  const cancelled = () => {
+    if (signal?.aborted) {
+      const error = new Error("Import cancelled.");
+      error.name = "AbortError";
+      throw error;
+    }
+  };
+  cancelled();
+  if (lazy && download) throw new Error("Lazy capture is for direct conversion only.");
   const tools = window.llm?.tools?.get_design_data;
   if (typeof testKit === "undefined" || !tools) {
     if (window.TinkerPower?.enable) {
@@ -132,10 +153,91 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
     }
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
-  const result = await tools.run({includeScreenshot: false});
-  const payload = result?.content?.[0]?.json || result?.json || result;
-  const shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
+  let shapes;
+  const roots = [...testKit.sceneModel.children.values()];
+  const compactMetadata = lazy && roots.every(node =>
+    node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
+      typeof node.data.dataType?.get === "function" &&
+      typeof node.data.tags?.get === "function" &&
+      typeof node.data.params?.get === "function"));
+  if (compactMetadata) {
+    onDiagnostic({phase:"compact-metadata"});
+    let visited = 0;
+    const read = async scene => {
+      cancelled();
+      const data = scene?.data;
+      if (data?.hasBeenRemoved) return null;
+      if (!data?.versions_id || typeof data.dataType?.get !== "function" ||
+          typeof data.tags?.get !== "function" || typeof data.params?.get !== "function")
+        throw new Error("Unsupported Tinkercad shape metadata; export stopped.");
+      if (++visited % 128 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+        cancelled();
+      }
+      // Copy only conversion metadata, never complete source parameter/tag objects.
+      const tags = {}, params = {};
+      for (const key of ["preview", "visible", "label", "volumePolarity", "isMulticolor"]) {
+        const value = data.tags.get(key);
+        if (value !== undefined) tags[key] = value;
+      }
+      if (scene.visible?.get) tags.visible = scene.visible.get();
+      const material = data.tags.get("renderingMaterial");
+      if (material?.color !== undefined) {
+        let color = material.color;
+        if (typeof color === "number") {
+          if (typeof window.llmUtils?.cleanColor !== "function")
+            throw new Error("Tinkercad colour conversion is unavailable.");
+          color = window.llmUtils.cleanColor(color);
+        }
+        tags.renderingMaterial = {color: color && typeof color === "object"
+          ? {r:color.r, g:color.g, b:color.b} : color};
+      }
+      for (const key of ["id", "fileName", "groupType"]) {
+        const value = data.params.get(key);
+        if (value !== undefined) params[key] = value;
+      }
+      const node = {versions_id:data.versions_id, dataType:data.dataType.get(), tags, params};
+      if (data.children?.size?.()) {
+        node.children = [];
+        for (const child of scene.children.values()) {
+          const captured = await read(child);
+          if (captured) node.children.push(captured);
+        }
+      }
+      return node;
+    };
+    shapes = [];
+    for (const root of roots) {
+      const node = await read(root);
+      if (node) shapes.push(node);
+    }
+  } else {
+    onDiagnostic({phase:"design-data"});
+    const result = await new Promise((resolve, reject) => {
+      let done = false;
+      const finish = (callback, value) => {
+        if (done) return;
+        done = true;
+        signal?.removeEventListener("abort", abort);
+        callback(value);
+      };
+      const abort = () => {
+        const error = new Error("Import cancelled.");
+        error.name = "AbortError";
+        finish(reject, error);
+      };
+      signal?.addEventListener("abort", abort, {once: true});
+      Promise.resolve().then(() => {
+        cancelled();
+        return tools.run({includeScreenshot: false});
+      }).then(value => finish(resolve, value), error => finish(reject, error));
+      if (signal?.aborted) abort();
+    });
+    const payload = result?.content?.[0]?.json || result?.json || result;
+    shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
+  }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  cancelled();
   const sceneNodes = new Map(), seen = new Set();
   function visit(node) {
     if (!node || seen.has(node)) return;
@@ -146,49 +248,150 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
     for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child);
   }
   visit(testKit.sceneModel);
-  const meshes = Object.create(null), meshParts = [], diagnostics = [], failures = [], ids = new Set();
-  let captured = 0;
+  const meshes = Object.create(null), meshParts = [], diagnostics = [];
+  let captured = 0, triangles = 0;
+  let total = 0;
+  const sourceNodes = new Map();
+  function count(nodes) {
+    for (const node of nodes) {
+      if (node.tags?.preview) continue;
+      const id = String(node.versions_id || "");
+      if (!id || sourceNodes.has(id)) throw new Error("Missing or repeated shape identity: " + id);
+      sourceNodes.set(id, node);
+      total++;
+      count(node.children || []);
+    }
+  }
+  count(shapes);
+  onDiagnostic({phase:"metadata-ready", totalParts:total});
+  const observedBuffers = new WeakSet();
+  let observedGeometryBytes = 0, evaluationsStarted = 0;
+  async function geometryFor(sn, node) {
+    const ready = sn.geometry?.get?.();
+    if (ready?.attributes?.position) return ready;
+    if (typeof sn.evaluate !== "function") throw new Error("Missing geometry evaluator");
+    onDiagnostic({phase:"evaluate", evaluationsStarted:++evaluationsStarted});
+    onProgress(`Waiting for geometry: ${node.tags?.label || node.params?.id || node.versions_id}`);
+    return new Promise((resolve, reject) => {
+      let done = false, poll, timeout;
+      const started = Date.now(), limit = 120000;
+      let lastProgress = 0, promiseReturned = 0, promiseSettled = 0, callbackReceived = 0;
+      const evaluationDiagnostic = phase => onDiagnostic({phase,
+        evaluationElapsedMs:Date.now()-started, evaluationLimitMs:limit,
+        evaluationPromiseReturned:promiseReturned, evaluationPromiseSettled:promiseSettled,
+        evaluationCallbackReceived:callbackReceived});
+      const finish = (error, geometry) => {
+        if (done) return;
+        done = true;
+        clearTimeout(poll);
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abort);
+        if (error) reject(error); else resolve(geometry);
+      };
+      const abort = () => {
+        const error = new Error("Import cancelled.");
+        error.name = "AbortError";
+        finish(error);
+      };
+      const check = () => {
+        if (done) return;
+        clearTimeout(poll);
+        if (signal?.aborted) return abort();
+        try {
+          const geometry = sn.geometry?.get?.();
+          if (geometry?.attributes?.position) {
+            evaluationDiagnostic("evaluation-ready");
+            return finish(null, geometry);
+          }
+          const elapsed = Date.now() - started;
+          if (elapsed - lastProgress >= 5000) {
+            lastProgress = elapsed;
+            evaluationDiagnostic("evaluation-wait");
+            onProgress(`Waiting for geometry: ${node.tags?.label || node.params?.id || node.versions_id} (${Math.floor(elapsed/1000)} seconds; Cancel is available)`);
+          }
+          poll = setTimeout(check, 50);
+        } catch (error) { finish(error); }
+      };
+      timeout = setTimeout(() => {
+        evaluationDiagnostic("evaluation-timeout");
+        finish(new Error("Geometry evaluation timed out after 120 seconds"));
+      }, limit);
+      signal?.addEventListener("abort", abort, {once: true});
+      if (signal?.aborted) return abort();
+      try {
+        // CSG groups accept a completion callback. Other evaluators may take
+        // geometry parameters as their first argument, so invoke them with no args.
+        const pending = node.dataType === "csg"
+          ? sn.evaluate(() => {callbackReceived = 1; check();}) : sn.evaluate();
+        if (pending?.then) {
+          promiseReturned = 1;
+          pending.then(() => {if (done) return; promiseSettled = 1; check();}, error => {
+            if (done) return;
+            promiseSettled = 1;
+            evaluationDiagnostic("evaluation-error");
+            finish(error);
+          });
+        }
+        check();
+      } catch (error) { finish(error); }
+    });
+  }
   // Encode each mesh while it is captured. Download mode retains Blob data,
   // rather than every expanded numeric array and a second giant JSON string.
-  const shapeBlob = download ? await tinkercadJsonBlob(shapes) : null;
-  async function capture(node) {
+  const shapeBlob = download ? await tinkercadJsonBlob(shapes, cancelled) : null;
+  async function captureMesh(node) {
+    cancelled();
     if (node.tags?.preview) return;
     const id = String(node.versions_id || "");
-    if (!id || ids.has(id)) throw new Error("Missing or repeated shape identity: " + id);
-    ids.add(id);
     const bundle = node.dataType === "csg" && node.params?.groupType === 0;
     if (!bundle) {
       const sn = sceneNodes.get(id);
       let world;
       try {
         if (!sn?.computeWorldMatrix) throw new Error("Missing scene node/world transform");
-        let geometry = sn.geometry?.get?.();
-        if (!geometry) {
-          let timer;
-          try {
-            await Promise.race([
-              new Promise((resolve, reject) => { try { sn.evaluate(resolve); } catch (e) { reject(e); } }),
-              new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Geometry evaluation timed out")), 20000); })
-            ]);
-          } finally { clearTimeout(timer); }
-          geometry = sn.geometry?.get?.();
-        }
+        const geometry = await geometryFor(sn, node);
+        cancelled();
         if (!geometry?.attributes?.position) throw new Error("Missing evaluated geometry");
+        for (const attribute of [...Object.values(geometry.attributes), geometry.index]) {
+          const array = attribute?.array || attribute?.data?.array;
+          if (array?.buffer && !observedBuffers.has(array.buffer)) {
+            observedBuffers.add(array.buffer);
+            observedGeometryBytes += array.buffer.byteLength;
+          }
+        }
+        const vertices = geometry.index?.count || geometry.attributes.position.count;
+        onDiagnostic({phase:"geometry-ready", observedGeometryBytes, currentTriangles:vertices/3,
+          plannedCaptureBytes:vertices*3*8*(geometry.attributes.normal ? 2 : 1)});
         // applyMatrix4 transforms normals with the inverse transpose, including nonuniform scale.
         const matrix = sn.computeWorldMatrix();
         world = geometry.clone();
         world.applyMatrix4(matrix);
-        if (world.index) { const indexed = world; world = world.toNonIndexed(); indexed.dispose(); }
-        const expand = attribute => {
-          const values = [];
-          for (let i=0; i<attribute.count; i++) values.push(attribute.getX(i),attribute.getY(i),attribute.getZ(i));
+        const expand = async attribute => {
+          const index = world.index;
+          const length = index ? index.count : attribute.count;
+          const values = new Float64Array(length * 3);
+          for (let i=0; i<length; i++) {
+            if (i && i % 32768 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              cancelled();
+            }
+            const vertex = index ? index.getX(i) : i;
+            values[i*3] = attribute.getX(vertex);
+            values[i*3+1] = attribute.getY(vertex);
+            values[i*3+2] = attribute.getZ(vertex);
+          }
           return values;
         };
-        const positions = expand(world.attributes.position);
-        const normals = world.attributes.normal ? expand(world.attributes.normal) : undefined;
+        const positions = await expand(world.attributes.position);
+        const normals = world.attributes.normal ? await expand(world.attributes.normal) : undefined;
+        onDiagnostic({phase:"captured", currentCaptureBytes:positions.byteLength + (normals?.byteLength || 0)});
         // A reflected transform reverses winding. Keep outward normals and front faces consistent.
         if (matrix.determinant() < 0) {
           for (let i = 0; i < positions.length; i += 9) {
+            if (i && i % 294912 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+              cancelled();
+            }
             for (let axis = 0; axis < 3; axis++) {
               [positions[i+3+axis], positions[i+6+axis]] = [positions[i+6+axis], positions[i+3+axis]];
               if (normals) [normals[i+3+axis], normals[i+6+axis]] = [normals[i+6+axis], normals[i+3+axis]];
@@ -198,29 +401,52 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}} = 
         if (!positions.length || positions.length % 9 || !positions.every(Number.isFinite)) throw new Error("Invalid triangle positions");
         if (normals && (normals.length !== positions.length || !normals.every(Number.isFinite))) throw new Error("Invalid normals");
         const mesh = {positions, normals, space:"world", csg:node.dataType === "csg"};
+        if (lazy) return mesh;
         if (download) {
           if (meshParts.length) meshParts.push(",");
-          meshParts.push(JSON.stringify(id) + ":", await tinkercadJsonBlob(mesh));
+          meshParts.push(JSON.stringify(id) + ":", await tinkercadJsonBlob(mesh, cancelled));
         } else {
           meshes[id] = mesh;
         }
         diagnostics.push({id, triangles:positions.length / 9});
-      } catch (error) { failures.push({id, message:String(error.message || error)}); }
+        triangles += positions.length / 9;
+      } catch (error) {
+        if (error?.name === "AbortError") throw error;
+        throw new Error(`Stopped at ${node.tags?.label || node.params?.id || id} (${id}): ${error?.message || error}. No partial project was downloaded.`);
+      }
       finally { world?.dispose(); }
     }
+  }
+  async function capture(node) {
+    cancelled();
+    if (node.tags?.preview) return;
+    await captureMesh(node);
     for (const child of node.children || []) await capture(child);
     captured++;
-    onProgress(`Capturing parts (${captured})…`);
+    onProgress(`Capturing parts (${captured}/${total}) · ${triangles.toLocaleString()} triangles…`);
     if (captured % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
   }
+  if (lazy) {
+    return {format:"tinkercad-evaluated-world-v1", shapes, meshes, readMesh: async id => {
+      cancelled();
+      const node = sourceNodes.get(id);
+      if (!node) throw new Error("Missing source shape: " + id);
+      const name = node.tags?.label || node.params?.id || id;
+      onProgress(`Reading geometry: ${name}…`);
+      const mesh = await captureMesh(node);
+      onProgress(`Read ${(mesh.positions.length / 9).toLocaleString()} triangles: ${name}`);
+      return mesh;
+    }};
+  }
   for (const node of shapes) await capture(node);
-  if (failures.length) throw new Error("Incomplete export (" + failures.length + " failures); no file downloaded. First failures: " + JSON.stringify(failures.slice(0, 20)));
+  cancelled();
   const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
   if (download) {
     const blob = new Blob([
       '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
-      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics), '}'
+      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics, cancelled), '}'
     ], {type:"application/json"});
+    cancelled();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url; link.download = "tinkercad-design.json"; link.click();
@@ -243,10 +469,16 @@ document.getElementById("convert").addEventListener("click", async () => {
   button.disabled=true;status.textContent="Converting locally…";
   try {
     const name=document.getElementById("project-name").value.trim()||"Tinkercad design";
-    const blob=await window.convertTinkercadToLayerling(JSON.parse(await file.text()),name,{onProgress:message=>{status.textContent=message;}});
+    let output = {extension:".lyl"};
+    const blob=await window.convertTinkercadToLayerling(JSON.parse(await file.text()),name,{
+      output:document.getElementById("export-mode").value,
+      onOutput:value=>{output=value;},onProgress:message=>{status.textContent=message;}});
     const link=document.getElementById("download");
-    releaseDownload=layerlingImportUI.setDownload(link,blob,name);
-    status.textContent="Project ready. Open the .lyl in layerling. Use the download link if needed.";
+    link.textContent=output.extension === ".zip" ? "Download assemblies ZIP again" : "Download .lyl again";
+    releaseDownload=layerlingImportUI.setDownload(link,blob,name,output.extension);
+    status.textContent=output.extension === ".zip"
+      ? `Export complete: ${output.importable} projects pass reader-limit checks; ${output.blocked} need attention and are not ready to open. Extract the ZIP and read README.txt.`
+      : "Project ready. Open the .lyl in layerling. Use the download link if needed.";
     try{link.click();}catch(_){}
   } catch(e) { status.textContent="Conversion failed: "+(e?.message||e); }
   finally {button.disabled=false;}

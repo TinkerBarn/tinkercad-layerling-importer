@@ -132,23 +132,24 @@ def main():
             shapes, nodes, features, groups, sketches = converter.convert(case["input"]["shapes"])
             roots = ["scene/object/" + shape["id"] for shape in shapes]
             expected = build_document(case["name"], nodes, roots, features, groups, sketches, converter._assets, shapes)
-            with zipfile.ZipFile(folder / (case["name"] + ".lyl")) as archive:
-                assert archive.testzip() is None, case["name"] + ": invalid ZIP CRC"
-                actual = json.loads(archive.read("project.json"))
-                a, b = normalize(actual), normalize(expected)
-                assert a == b, case["name"] + ": " + first_difference(a, b)
-                definitions = {node["objectId"]: node["definition"] for node in actual["states"][0]["nodes"]}
-                if case["name"] == "convex-alternate-triangulation":
-                    assert definitions["a"].get("hidden") and not definitions["b"].get("hidden")
-                if case["name"] in ("folded-not-duplicate", "different-normals", "reversed-winding"):
-                    assert not definitions["a"].get("hidden") and not definitions["b"].get("hidden")
-                for asset in converter._assets:
-                    data = archive.read(asset["path"])
-                    assert data == converter._asset_blobs[asset["id"]], case["name"] + ": binary mesh differs"
-                    assert hashlib.sha256(data).hexdigest() == asset["sha256"]
+            for suffix in ("", "-lazy"):
+                with zipfile.ZipFile(folder / (case["name"] + suffix + ".lyl")) as archive:
+                    assert archive.testzip() is None, case["name"] + ": invalid ZIP CRC"
+                    actual = json.loads(archive.read("project.json"))
+                    a, b = normalize(actual), normalize(expected)
+                    assert a == b, case["name"] + ": " + first_difference(a, b)
+                    definitions = {node["objectId"]: node["definition"] for node in actual["states"][0]["nodes"]}
+                    if case["name"] == "convex-alternate-triangulation":
+                        assert definitions["a"].get("hidden") and not definitions["b"].get("hidden")
+                    if case["name"] in ("folded-not-duplicate", "different-normals", "reversed-winding"):
+                        assert not definitions["a"].get("hidden") and not definitions["b"].get("hidden")
+                    for asset in converter._assets:
+                        data = archive.read(asset["path"])
+                        assert data == converter._asset_blobs[asset["id"]], case["name"] + ": binary mesh differs"
+                        assert hashlib.sha256(data).hexdigest() == asset["sha256"]
             if case["name"] == "local-capture":
                 print("Local capture geometry: " + json.dumps(verify(args.capture, folder / "local-capture.lyl")))
-    print(f"Browser/Python parity: {len(cases)} assemblies match, including exact mesh bytes and ZIP CRCs")
+    print(f"Browser/Python parity: {len(cases)} assemblies match in eager and lazy modes, including exact mesh bytes and ZIP CRCs")
 
 
 if __name__ == "__main__":

@@ -28,6 +28,9 @@ FILES = (
     "tinkercad-import/bookmarklet.html",
     "tinkercad-import/bookmarklet.template.html",
     "tinkercad-import/browser-convert.js",
+    "tinkercad-import/browser-assemblies.js",
+    "tinkercad-import/browser-loader.js",
+    "tinkercad-import/importer.js",
     "tinkercad-import/browser-ui.js",
     "tinkercad-import/browser-test-helpers.cjs",
     "tinkercad-import/convert.py",
@@ -61,6 +64,8 @@ def main():
     print(f"Wrote {output} ({len(sources)} source files plus checksums)")
     browser_files = {
         "index.html": sources["tinkercad-import/bookmarklet.html"],
+        "importer.js": sources["tinkercad-import/importer.js"],
+        "version.json": ('{"version":"' + (ROOT / "VERSION").read_text().strip() + '"}\n').encode(),
         "LICENSE.txt": sources["LICENSE"],
         "README.txt": (
             "Tinkercad to layerling - offline edition\n\n"
@@ -73,7 +78,10 @@ def main():
             "3. Open a design in the Tinkercad editor and click the bookmark.\n"
             "   If the editor reloads, click the bookmark again when it is ready.\n"
             "4. Wait for Project ready, then open the downloaded .lyl in layerling.\n"
-            "   Use Download .lyl again if the download did not start.\n\n"
+            "   Use Download .lyl again if the download did not start.\n"
+            "   Large designs can download as an assemblies ZIP. Extract it first.\n"
+            "   Open numbered .lyl files; files under needs-attention are preserved\n"
+            "   construction data that exceed reader limits and are not ready to open.\n\n"
             "The file is usually in Downloads. On layerling's start page choose\n"
             "Open a design or import geometry and select that .lyl file.\n\n"
             "Conversion stays in your browser. Your Tinkercad design stays unchanged.\n"

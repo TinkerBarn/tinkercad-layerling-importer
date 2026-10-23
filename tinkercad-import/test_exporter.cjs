@@ -7,7 +7,7 @@ const html = fs.readFileSync(__dirname + "/bookmarklet.html", "utf8");
 const source = html.match(/<script id="exporter">([\s\S]*?)<\/script>/)[1];
 const STRING_LIMIT = 262144;
 
-function environment() {
+function environment({timers = false} = {}) {
   let blob,
     downloads = 0,
     largestString = 0,
@@ -24,13 +24,16 @@ function environment() {
   };
   const context = vm.createContext({
     Blob,
+    AbortController,
     JSON: limitedJSON,
     console,
     setTimeout(fn, delay) {
+      if (timers) return setTimeout(fn, delay === 120000 ? 100 : delay);
       if (delay === 0) return setImmediate(fn);
       return 99;
     },
-    clearTimeout() {
+    clearTimeout(timer) {
+      if (timers) clearTimeout(timer);
       clearedTimers++;
     },
     URL: {
@@ -85,6 +88,158 @@ test("chunked JSON preserves nested data, optional fields, and Unicode", async (
     JSON.parse(await blob.text()),
     JSON.parse(JSON.stringify(env.context.value)),
   );
+});
+
+function installScene(env, scene, type = "preset", extra = []) {
+  scene.versions_id = "part";
+  env.context.testKit = {sceneModel: {children: new Map([["part", scene]])}};
+  env.context.llm = {tools: {get_design_data: {run: () => ({shapes: [
+    {versions_id: "part", dataType: type, params: {groupType: 1}, children: [], tags: {}}, ...extra,
+  ]})}}};
+}
+
+function triangleGeometry(index = null) {
+  const points = [[0,0,0],[2,0,0],[0,3,4],[2,3,4]];
+  return {
+    index,
+    attributes: {position: {count: index ? points.length : 3,
+      getX: i => points[i][0], getY: i => points[i][1], getZ: i => points[i][2]}},
+    clone() {return {...this, applyMatrix4() {}, dispose() {},
+      toNonIndexed() {throw Error("Unnecessary expanded geometry allocation");}};},
+  };
+}
+
+test("Promise-returning evaluators need no callback or parameter substitution", async () => {
+  const env = environment({timers: true});
+  let ready;
+  const scene = {geometry: {get: () => ready},
+    async evaluate(...args) {assert.equal(args.length, 0); await Promise.resolve(); ready = triangleGeometry();},
+    computeWorldMatrix: () => ({determinant: () => 1})};
+  installScene(env, scene);
+  const result = await vm.runInContext("exportTinkercadDesign({download:false})", env.context);
+  assert.equal(result.meshes.part.positions.length, 9);
+  assert.equal(env.downloads, 0);
+});
+
+test("lazy capture returns metadata without retaining expanded meshes", async () => {
+  const env = environment();
+  let clones = 0;
+  const geometry = triangleGeometry();
+  const clone = geometry.clone;
+  geometry.clone = () => { clones++; return clone.call(geometry); };
+  installScene(env, {geometry:{get:()=>geometry},computeWorldMatrix:()=>({determinant:()=>1})});
+  const capture = await vm.runInContext("exportTinkercadDesign({download:false,lazy:true})", env.context);
+  assert.equal(clones, 0);
+  const m = await capture.readMesh("part");
+  assert.equal(Object.prototype.toString.call(m.positions), "[object Float64Array]");
+  assert.equal(m.positions.byteLength, 72);
+  assert.equal(clones, 1);
+  assert.equal(Object.keys(capture.meshes).length, 0);
+  assert.equal(env.downloads, 0);
+});
+
+test("CSG callbacks and callback-free asynchronous geometry are both observed", async () => {
+  for (const type of ["csg", "preset"]) {
+    const env = environment({timers: true});
+    let ready;
+    const scene = {geometry: {get: () => ready},
+      evaluate(callback) {setTimeout(() => {ready = triangleGeometry(); callback?.();}, 5);},
+      computeWorldMatrix: () => ({determinant: () => 1})};
+    installScene(env, scene, type);
+    const result = await vm.runInContext("exportTinkercadDesign({download:false})", env.context);
+    assert.equal(result.meshes.part.positions.length, 9);
+  }
+});
+
+test("capture stops at the first evaluation failure instead of visiting later parts", async () => {
+  const env = environment({timers: true});
+  let laterReads = 0;
+  const scene = {geometry: {get: () => null}, evaluate: () => Promise.reject(Error("Evaluation failed")),
+    computeWorldMatrix: () => ({determinant: () => 1})};
+  installScene(env, scene, "preset", [{versions_id:"later",dataType:"preset"}]);
+  env.context.testKit.sceneModel.children.set("later", {versions_id:"later",geometry:{get(){laterReads++; return triangleGeometry();}}});
+  await assert.rejects(vm.runInContext("exportTinkercadDesign()", env.context), /Stopped at part.*Evaluation failed/);
+  assert.equal(laterReads, 0);
+  assert.equal(env.downloads, 0);
+});
+
+test("cancelling a pending evaluation stops without waiting for the timeout", async () => {
+  const env = environment({timers: true});
+  let started;
+  const waiting = new Promise(resolve => {started = resolve;});
+  const scene = {geometry: {get: () => null}, evaluate() {started(); return new Promise(() => {});},
+    computeWorldMatrix: () => ({determinant: () => 1})};
+  installScene(env, scene);
+  const controller = new AbortController();
+  env.context.signal = controller.signal;
+  const result = vm.runInContext("exportTinkercadDesign({signal})", env.context);
+  await waiting;
+  controller.abort();
+  await assert.rejects(result, error => error.name === "AbortError");
+  assert.equal(env.downloads, 0);
+});
+
+test("cancellation interrupts the initial design-data request even if it never resolves", async () => {
+  const env = environment({timers:true});
+  let began;
+  const started = new Promise(resolve => {began=resolve;});
+  env.context.testKit = {sceneModel:{children:new Map()}};
+  env.context.llm = {tools:{get_design_data:{run(){began();return new Promise(()=>{});}}}};
+  const controller = new AbortController();
+  env.context.signal = controller.signal;
+  const task = vm.runInContext("exportTinkercadDesign({signal})", env.context);
+  await started;
+  controller.abort();
+  await assert.rejects(task, error=>error.name==="AbortError");
+  assert.equal(env.downloads,0);
+});
+
+test("indexed geometry expands directly from the cloned index without a second geometry", async () => {
+  const env = environment();
+  const indices = [0,1,2,2,3,0];
+  const geometry = triangleGeometry({count:6,getX:i=>indices[i]});
+  geometry.attributes.normal = {count:4,getX:i=>i,getY:i=>i+1,getZ:i=>i+2};
+  const scene = {geometry:{get:()=>geometry},computeWorldMatrix:()=>({determinant:()=>1})};
+  installScene(env, scene);
+  const result = await vm.runInContext("exportTinkercadDesign({download:false})", env.context);
+  assert.deepEqual(Array.from(result.meshes.part.positions), [0,0,0,2,0,0,0,3,4,0,3,4,2,3,4,0,0,0]);
+  assert.equal(geometry.index.count, 6);
+  assert.equal(geometry.attributes.position.count, 4);
+  assert.deepEqual(Array.from(result.meshes.part.normals), indices.flatMap(i=>[i,i+1,i+2]));
+  assert.equal(geometry.attributes.normal.count, 4);
+});
+
+test("Cancel can interrupt one large mesh while its triangles are expanded", async () => {
+  const env = environment();
+  const controller = new AbortController();
+  let reads = 0, disposed = 0;
+  const geometry = triangleGeometry({ count: 150000, getX: i => i % 3 });
+  geometry.attributes.position.getX = () => {
+    reads++;
+    return 0;
+  };
+  geometry.clone = () => ({ ...geometry, applyMatrix4() {}, dispose() { disposed++; } });
+  installScene(env, { geometry: { get: () => geometry }, computeWorldMatrix: () => ({ determinant: () => 1 }) });
+  env.context.setTimeout = fn => setImmediate(() => { controller.abort(); fn(); });
+  env.context.signal = controller.signal;
+  await assert.rejects(vm.runInContext("exportTinkercadDesign({download:false,signal})", env.context),
+    error => error.name === "AbortError");
+  assert.ok(reads < geometry.index.count, "the whole mesh must not be expanded after Cancel");
+  assert.equal(disposed, 1);
+  assert.equal(env.downloads, 0);
+});
+
+test("Cancel during chunked JSON encoding prevents a diagnostics download", async () => {
+  const env = environment();
+  const controller = new AbortController();
+  const shape = { versions_id: "part", dataType: "preset", params: { values: new Array(600000).fill(0) } };
+  env.context.llm = { tools: { get_design_data: { run: () => ({ shapes: [shape] }) } } };
+  env.context.testKit = { sceneModel: { children: new Map() } };
+  env.context.signal = controller.signal;
+  env.context.setTimeout = fn => setImmediate(() => { controller.abort(); fn(); });
+  await assert.rejects(vm.runInContext("exportTinkercadDesign({signal})", env.context),
+    error => error.name === "AbortError");
+  assert.equal(env.downloads, 0);
 });
 
 test("the actual download exports large meshes without a whole-capture or whole-mesh string", async () => {
@@ -175,7 +330,7 @@ test("missing geometry never downloads a partial capture", async () => {
   env.context.testKit = { sceneModel: { children: new Map() } };
   await assert.rejects(
     vm.runInContext("exportTinkercadDesign()", env.context),
-    /Incomplete export/,
+    /Stopped at missing/,
   );
   assert.equal(env.downloads, 0);
 });
@@ -289,9 +444,8 @@ test("evaluated geometry clears its timeout and disposes cloned geometry even wh
   const scene = {
     versions_id: "bad",
     geometry: { get: () => (available ? geometry : null) },
-    evaluate(callback) {
+    evaluate() {
       available = true;
-      callback();
     },
     computeWorldMatrix: () => ({ determinant: () => 1 }),
   };
@@ -307,7 +461,100 @@ test("evaluated geometry clears its timeout and disposes cloned geometry even wh
     vm.runInContext("exportTinkercadDesign()", env.context),
     /Unreadable position/,
   );
-  assert.equal(env.clearedTimers, 1);
+  assert.ok(env.clearedTimers >= 1);
   assert.equal(disposed, 1);
   assert.equal(env.downloads, 0);
+});
+
+function compactScene(shape, children = []) {
+  const unused = () => {throw Error("Heavy metadata serialization must not run");};
+  return {
+    data: {versions_id:shape.versions_id, dataType:{get:()=>shape.dataType},
+      tags:{get:key=>shape.tags?.[key],toJSON:unused},
+      params:{get:key=>shape.params?.[key],toJSON:unused},
+      children:{size:()=>children.length}},
+    children:new Map(children.map(child=>[child.data.versions_id,child])),
+    visible:{get:()=>shape.tags?.visible !== false},
+    geometry:{get:()=>triangleGeometry()},computeWorldMatrix:()=>({determinant:()=>1})
+  };
+}
+
+test("direct metadata preserves construction operands without copying full tags or parameters", async () => {
+  const env = environment();
+  const child = compactScene({versions_id:"hole",dataType:"preset",
+    params:{id:"Box",fileName:"hole.stl"},tags:{visible:false,volumePolarity:-1,
+      label:"Hidden cutter",renderingMaterial:{color:{r:1,g:2,b:3}},unused:"large source data"}});
+  const group = compactScene({versions_id:"group",dataType:"csg",params:{groupType:1},
+    tags:{label:"Boolean",isMulticolor:true,renderingMaterial:{color:123}}},[child]);
+  env.context.testKit = {sceneModel:{children:new Map([["group",group],["removed",{data:{hasBeenRemoved:true}}]])}};
+  env.context.llm = {tools:{get_design_data:{run(){throw Error("Heavy design-data tool must not run");}}}};
+  env.context.llmUtils = {cleanColor(value){assert.equal(value,123);return {r:10,g:20,b:30};}};
+  const phases=[];env.context.onDiagnostic=x=>phases.push(x.phase);
+  const capture=await vm.runInContext("exportTinkercadDesign({download:false,lazy:true,onDiagnostic})",env.context);
+  assert.deepEqual(JSON.parse(JSON.stringify(capture.shapes)),[
+    {versions_id:"group",dataType:"csg",tags:{label:"Boolean",isMulticolor:true,
+    visible:true,renderingMaterial:{color:{r:10,g:20,b:30}}},params:{groupType:1},children:[{
+      versions_id:"hole",dataType:"preset",tags:{visible:false,label:"Hidden cutter",volumePolarity:-1,
+        renderingMaterial:{color:{r:1,g:2,b:3}}},params:{id:"Box",fileName:"hole.stl"}}]}]);
+  assert.ok(phases.includes("compact-metadata"));
+  assert.equal((await capture.readMesh("hole")).positions.length,9);
+  assert.equal((await capture.readMesh("group")).positions.length,9);
+});
+
+test("compact metadata traversal yields to cancellation before reading geometry", async () => {
+  const env=environment();const controller=new AbortController();
+  const nodes=Array.from({length:260},(_,i)=>compactScene({versions_id:"p"+i,dataType:"preset"}));
+  for(const node of nodes) node.geometry.get=()=>{throw Error("Geometry must not be read");};
+  env.context.testKit={sceneModel:{children:new Map(nodes.map(n=>[n.data.versions_id,n]))}};
+  env.context.llm={tools:{get_design_data:{run(){throw Error("Heavy metadata must not run");}}}};
+  env.context.signal=controller.signal;
+  const run=vm.runInContext("exportTinkercadDesign({download:false,lazy:true,signal})",env.context);
+  setImmediate(()=>controller.abort());
+  await assert.rejects(run,{name:"AbortError"});
+});
+
+function evaluationClock(env) {
+  let now=0, next=0;
+  const timers=new Map();
+  env.context.Date={now:()=>now};
+  env.context.setTimeout=(fn,delay)=>{const id=++next;timers.set(id,{fn,at:now+delay,delay});return id;};
+  env.context.clearTimeout=id=>timers.delete(id);
+  return {timers, tick(value) {now=value;const due=[...timers].filter(([,t])=>t.at<=now);
+    for(const [id,t] of due) {if(timers.delete(id))t.fn();}}};
+}
+
+test("a slow geometry evaluation can complete after the former 20-second deadline without restarting", async () => {
+  const env=environment(), clock=evaluationClock(env);let ready, calls=0, complete;
+  const events=[];env.context.onDiagnostic=e=>events.push(e);
+  installScene(env,{geometry:{get:()=>ready},evaluate(){calls++;return new Promise(r=>{complete=r;});},
+    computeWorldMatrix:()=>({determinant:()=>1})});
+  const run=vm.runInContext("exportTinkercadDesign({download:false,onDiagnostic})",env.context);
+  for(let i=0;i<12;i++) await Promise.resolve();
+  assert.equal(calls,1);
+  assert.ok([...clock.timers.values()].some(t=>t.delay===120000));
+  clock.tick(25000);
+  assert.ok(events.some(e=>e.phase==="evaluation-wait" && e.evaluationElapsedMs===25000));
+  ready=triangleGeometry();complete();
+  const capture=await run;
+  assert.equal(capture.meshes.part.positions.length,9);
+  assert.equal(calls,1);
+  assert.equal(clock.timers.size,0);
+  assert.ok(events.some(e=>e.phase==="evaluation-ready" && e.evaluationPromiseSettled===1));
+});
+
+test("a stalled evaluator records its deadline and stops without a partial project", async () => {
+  const env=environment(), clock=evaluationClock(env),events=[];
+  env.context.onDiagnostic=e=>events.push(e);
+  installScene(env,{geometry:{get:()=>null},evaluate(){return new Promise(()=>{});},
+    computeWorldMatrix:()=>({determinant:()=>1})});
+  const run=vm.runInContext("exportTinkercadDesign({download:false,onDiagnostic})",env.context);
+  const rejected=assert.rejects(run,/Geometry evaluation timed out after 120 seconds/);
+  for(let i=0;i<12;i++)await Promise.resolve();
+  clock.tick(120000);await rejected;
+  const last=events.find(e=>e.phase==="evaluation-timeout");
+  assert.equal(last.evaluationElapsedMs,120000);
+  assert.equal(last.evaluationPromiseReturned,1);
+  assert.equal(last.evaluationPromiseSettled,0);
+  assert.equal(clock.timers.size,0);
+  assert.equal(env.downloads,0);
 });

@@ -101,6 +101,8 @@ function bookmarkEnvironment() {
   };
   const env = {
     Blob,
+    CompressionStream,
+    AbortController,
     TextEncoder,
     DataView,
     Uint8Array,
