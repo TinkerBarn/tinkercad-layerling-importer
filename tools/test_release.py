@@ -1,5 +1,6 @@
 """Offline release-boundary regressions; no account or network needed."""
 import hashlib
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,15 @@ import build_browser
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_minifier_preserves_unicode_source_text(self):
+        source = "globalThis.message = 'Counting parts… café';"
+        compact = build_browser.minify(source)
+        result = subprocess.check_output(
+            ["node", "-e", compact + ";process.stdout.write(globalThis.message)"],
+            encoding="utf-8",
+        )
+        self.assertEqual(result, "Counting parts… café")
+
     def test_bookmark_url_accepts_exact_firefox_limit_and_rejects_overflow(self):
         source = "x" * (65536 - len("javascript:"))
         self.assertEqual(len(build_browser.bookmark_url(source)), 65536)

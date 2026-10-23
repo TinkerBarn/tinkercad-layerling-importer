@@ -223,9 +223,11 @@ Version 0.2.3 was published and deployed on 23 October 2026 from 3c4ca79b606c5db
 User authorized repairing the oversized bookmark, asking the reporter for a direct diagnostic upload and releasing the correction. v0.2.4 keeps the self-contained default and adds pinned build-only Terser minification. Readable source, console script and online runtime remain available.
 
 ### Findings
-The old regression fails at 124,607 characters; compact v0.2.4 is 59,715, within Firefox's 65,536-character saved URL limit. Compression rewrites and property renaming are disabled. All 87 local checks and 18 eager/lazy exact parity assemblies pass; parity runs compact bookmark definitions. Browser users need no installation or new API. Development/release builds require npm ci --ignore-scripts.
+The old regression fails at 124,607 characters; compact v0.2.4 is 59,713, within Firefox's 65,536-character saved URL limit. Compression rewrites and property renaming are disabled. All 88 local checks and 18 eager/lazy exact parity assemblies pass; parity runs compact bookmark definitions. Browser users need no installation or new API. Development/release builds require npm ci --ignore-scripts.
 
 ### TODO
 - [x] Source/browser allowlists, hashes, CRC integrity and extracted-source checks pass. Commit/push and Windows/Linux CI are next.
 - Audit draft assets, publish/deploy v0.2.4, verify hosted files and ask KimA998 to upload the diagnostic JSON/error directly on GitHub.
 - Firefox UI access timed out; final native-browser installation/capture and Layerling editing round-trip checks remain unverified.
+
+Build follow-up: Linux freshness CI exposed Windows locale encoding of minifier input. A Unicode round-trip regression failed before setting explicit UTF-8 subprocess encoding and now passes. Generated compact code preserves its original text consistently across platforms.

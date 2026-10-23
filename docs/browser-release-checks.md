@@ -8,7 +8,7 @@ The bookmark uses modern JavaScript, Web Crypto, Blob downloads and Tinkercad's 
 
 ## Automated evidence
 
-- Version 0.2.4 has 14 Python regressions, 63 Node regressions and ten release-boundary regressions covering evaluated geometry, normals, color inheritance, duplicate surfaces and winding, progress, retry, disposal, capture failure, cancellation and lossless compression with an uncompressed fallback.
+- Version 0.2.4 has 14 Python regressions, 63 Node regressions and eleven release-boundary regressions covering evaluated geometry, normals, color inheritance, duplicate surfaces and winding, progress, retry, disposal, capture failure, cancellation and lossless compression with an uncompressed fallback.
 - 18 synthetic assemblies compare browser and Python project documents and mesh bytes.
 - Source ZIP contents and checksums are verified; portable checks rerun from the extracted source ZIP.
 - The offline ZIP and hosted site share identical installer bytes.
@@ -102,6 +102,8 @@ The user reports successful export of the previously failing large design. Assem
 
 A reporter could save the earlier bookmark in Firefox but could not drag/save v0.2.3. Its self-contained URL grew from 62,782 characters in v0.2.2 to 124,607 in v0.2.3. Mozilla documents a 65,536-character saved URL limit (https://bugzilla.mozilla.org/show_bug.cgi?id=2000525#c3). This provides a strong explanation for the reported installation regression; no live reproduction on the reporter's build has been made.
 
-The build now uses pinned Terser 5.44.0 to remove comments/whitespace and shorten local variable names, with compression rewrites and property renaming disabled. The self-contained v0.2.4 bookmark is 59,715 characters and needs no new browser API or network loader. Both generated bookmarks are rejected at build time if they exceed 65,536 characters. Exact-boundary/overflow and URL-encoding checks cover the builder. The size regression failed against v0.2.3 before the fix.
+The build now uses pinned Terser 5.44.0 to remove comments/whitespace and shorten local variable names, with compression rewrites and property renaming disabled. The self-contained v0.2.4 bookmark is 59,713 characters and needs no new browser API or network loader. Both generated bookmarks are rejected at build time if they exceed 65,536 characters. Exact-boundary/overflow and URL-encoding checks cover the builder. The size regression failed against v0.2.3 before the fix.
 
-Browser regressions run the actual compact bookmark, including conversion/download, progress, errors and cancellation. Eager/lazy parity now also executes its definitions rather than the unminified converter alone. All 87 automated checks pass, with 18 exact synthetic parity assemblies. Firefox UI access timed out during the attempted live check; actual bookmark installation and live-editor capture remain unverified. The optional online loader remains experimental. The new Chrome report cannot be diagnosed until the reporter uploads the missing failure JSON/error directly on GitHub.
+Browser regressions run the actual compact bookmark, including conversion/download, progress, errors and cancellation. Eager/lazy parity now also executes its definitions rather than the unminified converter alone. All 88 automated checks pass, with 18 exact synthetic parity assemblies. Firefox UI access timed out during the attempted live check; actual bookmark installation and live-editor capture remain unverified. The optional online loader remains experimental. The new Chrome report cannot be diagnosed until the reporter uploads the missing failure JSON/error directly on GitHub.
+
+Build follow-up: Linux freshness CI exposed Windows locale encoding of minifier input. A Unicode round-trip regression failed before setting explicit UTF-8 subprocess encoding and now passes. Generated compact code preserves its original text consistently across platforms.

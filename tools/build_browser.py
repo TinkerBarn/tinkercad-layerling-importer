@@ -24,7 +24,7 @@ def bookmark_url(source):
 def minify(source):
     result = subprocess.run(
         ["node", str(ROOT / "tools/minify_browser.cjs")], input=source,
-        text=True, capture_output=True, cwd=ROOT,
+        text=True, encoding="utf-8", capture_output=True, cwd=ROOT,
     )
     if result.returncode:
         raise RuntimeError("Bookmark minification failed; run npm ci --ignore-scripts first.\n" + result.stderr)
