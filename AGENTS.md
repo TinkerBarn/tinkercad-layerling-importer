@@ -15,6 +15,8 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
+Current published preview is v0.2.4. The self-contained bookmark is 59,713 characters and builds enforce Firefox's 65,536-character URL limit. All 88 local checks and four corrected Windows/Linux CI jobs pass; release assets and HTTPS hosting have been verified. Live Firefox export and the Layerling editing round trip remain unverified. Earlier entries below are historical evidence.
+
 Version 0.2.3 is in development for large-design failures. Fixed mixed geometry-evaluation completion contracts, added Cancel and a bounded scrollable panel, stopped at first capture failure, and removed intermediate mesh arrays. User reports successful capture of the supplied Kyogre reproduction. Added lossless native browser ZIP compression with STORE fallback; verified all 145 entries of its 115,366,065-byte download remain identical in a 20,575,980-byte archive written by the new ZIP writer under Node. 37 Node and 14 Python tests pass. Eighteen synthetic assemblies plus the private reference retain exact mesh bytes and zero stored vertex error. Nothing published.
 
 Version 0.2.2 instructions published: one-time setup, bookmarks-bar shortcuts, drag instructions, per-design export, download location and common problems. Windows/Linux CI and release deployment passed. Real Chrome JSON conversion and download retry passed; four meshes match the source with zero measured vertex error. Export code is unchanged.
@@ -226,8 +228,13 @@ User authorized repairing the oversized bookmark, asking the reporter for a dire
 The old regression fails at 124,607 characters; compact v0.2.4 is 59,713, within Firefox's 65,536-character saved URL limit. Compression rewrites and property renaming are disabled. All 88 local checks and 18 eager/lazy exact parity assemblies pass; parity runs compact bookmark definitions. Browser users need no installation or new API. Development/release builds require npm ci --ignore-scripts.
 
 ### TODO
-- [x] Source/browser allowlists, hashes, CRC integrity and extracted-source checks pass. Commit/push and Windows/Linux CI are next.
-- Audit draft assets, publish/deploy v0.2.4, verify hosted files and ask KimA998 to upload the diagnostic JSON/error directly on GitHub.
+- [x] Source/browser allowlists, hashes, CRC integrity and extracted-source checks pass. Corrected release source 122c316 pushed; all four CI jobs pass (39948378933).
+- [x] v0.2.4 draft preparation (39948656494) and publication/Pages deployment (39948766669) succeeded. Public ZIP hashes and all five hosted files match the audited release. Posted the requested direct-upload reply to KimA998.
 - Firefox UI access timed out; final native-browser installation/capture and Layerling editing round-trip checks remain unverified.
 
 Build follow-up: Linux freshness CI exposed Windows locale encoding of minifier input. A Unicode round-trip regression failed before setting explicit UTF-8 subprocess encoding and now passes. Generated compact code preserves its original text consistently across platforms.
+
+### v0.2.4 published result
+Version 0.2.4 preview is published at https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/tag/v0.2.4 and deployed at https://taylormadearmy.github.io/tinkercad-layerling-importer/ . Source commit 122c316fb4173cace5bcbd6bbfcbc3fa15210238. All 38 source files match tagged Git bytes; both ZIP external hashes/allowlists/CRC and all five hosted-file comparisons pass. The main bookmark remains self-contained and no native-shape conversion was added.
+
+Reporter reply: https://github.com/henmedia/layerling/discussions/683#discussioncomment-19145027 . Await the actual Chrome error and JSON report; no Chrome export diagnosis is established by the missing email attachment. Final live Firefox installation/export and Layerling Open/Insert/Ungroup/save/reopen checks remain outstanding.
