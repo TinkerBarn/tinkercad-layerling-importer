@@ -2,7 +2,7 @@
 
 Bring your Tinkercad design into Layerling so you can keep editing it. Use the saved export bookmark whenever you want to transfer a design.
 
-**[Open the setup page](https://taylormadearmy.github.io/tinkercad-layerling-importer/)** · **[Download the offline edition](https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v0.2.2/tinkercad-layerling-browser.zip)**
+**[Setup page source in this fork](https://github.com/TinkerBarn/tinkercad-layerling-importer/blob/codex/publish-browser-importer/tinkercad-import/bookmarklet.html)**. The hosted page is not active because GitHub Pages is disabled for this fork.
 
 ## Set up once
 
@@ -31,7 +31,7 @@ Evaluated triangle geometry, colors, grouping, visibility, and boolean operands 
 
 Capture reads the open design without modifying it. Conversion stays in your browser; the importer does not upload designs. GitHub hosts the installer and has its own hosting logs. This unofficial preview uses Tinkercad's undocumented editor tools, which can change. It is not affiliated with Autodesk or Layerling.
 
-See [compatibility and checks](docs/browser-release-checks.md). Report problems through [GitHub Issues](https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml); include the version, browser, operating system and error. Do not attach a private design.
+See [compatibility and checks](docs/browser-release-checks.md). The fork has GitHub Issues disabled; include the version, browser, operating system and error when reporting a problem elsewhere. Do not attach a private design.
 
 ## Developers
 
