@@ -346,6 +346,11 @@ test("boolean groups retain evaluated output and editable children", async () =>
   assert.equal(cutter.definition.hole, true);
 });
 
+test("the installed bookmark fits Firefox's saved URL limit", () => {
+  const url = "javascript:" + encodeURIComponent(bookmarkSource());
+  assert.ok(url.length <= 65536, `Bookmark URL is ${url.length} characters; Firefox allows 65536`);
+});
+
 test("generated install page embeds a syntactically valid, self-contained bookmarklet", () => {
   const bookmark = bookmarkSource();
   assert.match(bookmark, /convertTinkercadToLayerling/);

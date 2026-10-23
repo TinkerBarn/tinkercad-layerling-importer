@@ -50,6 +50,9 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.source.outputs.commit }}
+      - name: Install build tooling
+        if: inputs.mode == 'prepare'
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Prepare, verify or publish
         run: python tools/release.py "$MODE" "$TAG"
       - name: Upload exact browser files for deployment

@@ -1345,7 +1345,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
 /* Shared browser download controls and the Tinkercad bookmark entry point. */
 (function (root) {
   "use strict";
-  const VERSION = "0.2.3";
+  const VERSION = "0.2.4";
   const SITE = "https://taylormadearmy.github.io/tinkercad-layerling-importer/";
   root.layerlingImporterVersion = VERSION;
   const sizeLabel = bytes => bytes >= 1024**3 ? `${(bytes/1024**3).toFixed(2)} GiB` : `${(bytes/1024**2).toFixed(1)} MiB`;

@@ -4,9 +4,10 @@ Use synthetic, shareable examples. Do not commit captured designs, generated `.l
 
 ## Build and check
 
-Install Python 3.10+ and Node.js 22. No package installation is required. Run from the repository root (use `py` or `python3` instead of `python` where needed):
+Install Python 3.10+ and Node.js 22. Install the pinned build-only minifier with the first command below. Browser users need no installation. Run from the repository root (use `py` or `python3` instead of `python` where needed):
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 python tools/build_browser.py
 python tinkercad-import/convert.py --self-test
 node --test tinkercad-import/test_browser_converter.cjs tinkercad-import/test_exporter.cjs
@@ -17,7 +18,7 @@ python -m unittest discover -s tools -p "test_release.py"
 git diff --check
 ```
 
-Edit the HTML template and browser modules, then rebuild the generated HTML. Commit both the source and generated page. CI checks freshness on Windows and Linux. The parity check compares browser output with the Python reference across synthetic assemblies; package checks rerun the portable checks from the extracted source ZIP.
+Edit the HTML template and browser modules, then rebuild the generated HTML. The build uses Terser only to remove comments/whitespace and shorten local names; compression rewrites and property renaming are disabled. It rejects either bookmark above Firefox’s 65,536-character URL limit. Commit the generated page with its sources. CI checks freshness on Windows and Linux. The browser regressions execute the actual compact bookmark. The parity check compares browser output with the Python reference across synthetic assemblies; package checks rerun the portable checks from the extracted source ZIP.
 
 For an optional local capture comparison, use `python tools/check_browser_parity.py --capture path/to/capture.json`. Keep that capture outside Git.
 

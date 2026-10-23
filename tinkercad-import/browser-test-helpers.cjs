@@ -11,6 +11,9 @@ function bookmarkSource() {
       )[1],
     };
   }
+  objects["bookmark-source"] = {
+    textContent: html.match(/<script id="bookmark-source" type="application\/json">([\s\S]*?)<\/script>/)?.[1],
+  };
   const scripts = [
     ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g),
   ];

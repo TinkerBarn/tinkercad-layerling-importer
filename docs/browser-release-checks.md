@@ -2,13 +2,13 @@
 
 ## Support level
 
-Version 0.2.3 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
+Version 0.2.4 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
 
 The bookmark uses modern JavaScript, Web Crypto, Blob downloads and Tinkercad's undocumented editor tools. Browser policies can block bookmark installation, console pasting or automatic downloads. A persistent download link is provided when automatic download does not start. Large designs depend on available memory.
 
 ## Automated evidence
 
-- Version 0.2.3 has 14 Python regressions, 62 Node regressions and eight release-boundary regressions covering evaluated geometry, normals, color inheritance, duplicate surfaces and winding, progress, retry, disposal, capture failure, cancellation and lossless compression with an uncompressed fallback.
+- Version 0.2.4 has 14 Python regressions, 63 Node regressions and ten release-boundary regressions covering evaluated geometry, normals, color inheritance, duplicate surfaces and winding, progress, retry, disposal, capture failure, cancellation and lossless compression with an uncompressed fallback.
 - 18 synthetic assemblies compare browser and Python project documents and mesh bytes.
 - Source ZIP contents and checksums are verified; portable checks rerun from the extracted source ZIP.
 - The offline ZIP and hosted site share identical installer bytes.
@@ -96,3 +96,12 @@ The second pass corrected ZIP MIME/labels and the saved-JSON assembly fallback. 
 All 84 automated checks pass locally. Eighteen synthetic assemblies match Python in eager and lazy modes, including exact mesh bytes and ZIP CRCs. Source/browser allowlists, hashes, ZIP integrity and portable checks from the extracted source pass. The final self-contained bookmark URL is 124,607 characters; its installation and execution remain unverified. Earlier candidate results above are historical and do not establish final-browser compatibility.
 
 The user reports successful export of the previously failing large design. Assembly partitioning preserves complete construction subtrees and placement. Passing reader-limit checks does not establish live Layerling loading/editing, Insert alignment or save/reopen. The optional online loader and update check remain experimental until exercised in the authenticated editor. No other-browser support or measured editing-speed improvement is claimed.
+
+
+### Firefox bookmark size fix — 23 October 2026, v0.2.4
+
+A reporter could save the earlier bookmark in Firefox but could not drag/save v0.2.3. Its self-contained URL grew from 62,782 characters in v0.2.2 to 124,607 in v0.2.3. Mozilla documents a 65,536-character saved URL limit (https://bugzilla.mozilla.org/show_bug.cgi?id=2000525#c3). This provides a strong explanation for the reported installation regression; no live reproduction on the reporter's build has been made.
+
+The build now uses pinned Terser 5.44.0 to remove comments/whitespace and shorten local variable names, with compression rewrites and property renaming disabled. The self-contained v0.2.4 bookmark is 59,715 characters and needs no new browser API or network loader. Both generated bookmarks are rejected at build time if they exceed 65,536 characters. Exact-boundary/overflow and URL-encoding checks cover the builder. The size regression failed against v0.2.3 before the fix.
+
+Browser regressions run the actual compact bookmark, including conversion/download, progress, errors and cancellation. Eager/lazy parity now also executes its definitions rather than the unminified converter alone. All 87 automated checks pass, with 18 exact synthetic parity assemblies. Firefox UI access timed out during the attempted live check; actual bookmark installation and live-editor capture remain unverified. The optional online loader remains experimental. The new Chrome report cannot be diagnosed until the reporter uploads the missing failure JSON/error directly on GitHub.

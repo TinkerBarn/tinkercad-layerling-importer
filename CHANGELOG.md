@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 — Preview — 23 October 2026
+
+- Fix Firefox bookmark installation by minifying the self-contained bookmark below its 65,536-character saved-URL limit. Version 0.2.3 exceeded this limit.
+- Fail builds when either generated bookmark exceeds the limit, and execute the compact bookmark in browser regressions and geometry parity checks.
+- Keep readable sources and the full console troubleshooting script. Minification adds a pinned build-only dependency; browser users need no installation or new runtime feature.
+- Remove the outdated message that the experimental online runtime has not been published. Its live editor compatibility remains unverified.
+
+Refresh the setup page and replace the saved bookmark. Export geometry and construction-history behavior are unchanged.
+
 ## 0.2.3 — Preview — 23 October 2026
 
 - Observe Promise-based, callback-based and asynchronous geometry evaluation.

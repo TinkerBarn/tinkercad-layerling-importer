@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Install build tooling
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Converter regressions
         run: python tinkercad-import/convert.py --self-test
       - name: Exporter regressions
@@ -31,7 +33,7 @@ jobs:
       - name: Build bookmarklet page
         run: python tools/build_browser.py
       - name: Check generated page is current
-        run: git diff --exit-code -- tinkercad-import/bookmarklet.html
+        run: git diff --exit-code -- tinkercad-import/bookmarklet.html tinkercad-import/importer.js
       - name: Browser and Python parity
         run: python tools/check_browser_parity.py
       - name: Build source distribution

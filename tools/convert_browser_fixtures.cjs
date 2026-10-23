@@ -10,11 +10,8 @@ async function main() {
     throw Error(
       "Usage: node convert_browser_fixtures.cjs cases.json output-directory",
     );
-  const html = fs.readFileSync(
-    path.join(__dirname, "../tinkercad-import/bookmarklet.html"),
-    "utf8",
-  );
-  const source = html.match(/<script id="converter">([\s\S]*?)<\/script>/)[1];
+  const { bookmarkSource } = require("../tinkercad-import/browser-test-helpers.cjs");
+  const source = bookmarkSource().replace(/void runLayerlingImport\(\);\s*$/, "");
   const context = vm.createContext({
     Blob,
     CompressionStream,

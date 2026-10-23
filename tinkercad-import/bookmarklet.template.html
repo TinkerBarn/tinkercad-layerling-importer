@@ -39,7 +39,7 @@
   </li>
 </ol>
 <details><summary>Optional online bookmark: updates without replacing it</summary>
-<p>Experimental: drag <a class="mark" id="online-mark" href="{{ONLINE_BOOKMARK}}">Export to layerling (online)</a> to your bookmarks bar once. It loads the currently published exporter each time you use it. Internet access is required; Tinkercad may block external scripts. If it is blocked, use the self-contained blue bookmark above. This feature will become available after the supporting files are published.</p>
+<p>Experimental: drag <a class="mark" id="online-mark" href="{{ONLINE_BOOKMARK}}">Export to layerling (online)</a> to your bookmarks bar once. It loads the currently published exporter each time you use it. Internet access is required; Tinkercad may block external scripts. If it is blocked, use the self-contained blue bookmark above.</p>
 <p>Both bookmarks convert locally. The online bookmark requests code from this project's static website without sending design data.</p>
 </details>
 <h2>Export a design</h2>
@@ -54,6 +54,7 @@
 <details><summary>Something not working?</summary>
 <ul>
   <li><strong>The saved bookmark is missing:</strong> show the bookmarks bar again using the shortcuts above. If the bar has a menu at its right-hand end, check there for bookmarks that do not fit.</li>
+  <li><strong>Firefox would not save the v0.2.3 bookmark:</strong> that version exceeded Firefox’s bookmark size limit. Refresh this page and drag the updated blue button onto the bookmarks bar. The current self-contained bookmark is built to fit that limit.</li>
   <li><strong>Clicking the bookmark asks you to open Tinkercad:</strong> switch to the tab containing your design’s editor, then click the saved bookmark there.</li>
   <li><strong>The export shows an error:</strong> wait until the design has finished loading, close the export panel and try the bookmark again. If it still fails, click <strong>Download failure report</strong> in the export panel, then use <strong>Report a problem</strong> below and include that report and the error text.</li>
   <li><strong>The file is missing:</strong> look in your Downloads folder, or use <strong>Download .lyl again</strong> while the export panel is still open.</li>
@@ -484,12 +485,14 @@ document.getElementById("convert").addEventListener("click", async () => {
   finally {button.disabled=false;}
 });
 </script>
+<script id="bookmark-source" type="application/json">{{BOOKMARK_SOURCE}}</script>
 <script>
   const converter=document.getElementById("converter").textContent.trim();
   const exporter=document.getElementById("exporter").textContent.trim();
   const importer=document.getElementById("importer").textContent.trim();
   const source=converter+'\n'+exporter+'\n'+importer+'\nvoid runLayerlingImport();';
-  document.getElementById("mark").href = "javascript:" + encodeURIComponent(source);
+  const bookmarkSource=JSON.parse(document.getElementById("bookmark-source").textContent);
+  document.getElementById("mark").href = "javascript:" + encodeURIComponent(bookmarkSource);
   document.getElementById("copy").addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(source);

@@ -7,9 +7,21 @@ import zipfile
 from unittest.mock import patch
 
 import release
+import build_browser
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_bookmark_url_accepts_exact_firefox_limit_and_rejects_overflow(self):
+        source = "x" * (65536 - len("javascript:"))
+        self.assertEqual(len(build_browser.bookmark_url(source)), 65536)
+        with self.assertRaisesRegex(ValueError, "Firefox allows"):
+            build_browser.bookmark_url(source + "x")
+
+    def test_bookmark_limit_counts_url_encoding_not_raw_source(self):
+        self.assertEqual(build_browser.bookmark_url("é"), "javascript:%C3%A9")
+        with self.assertRaisesRegex(ValueError, "Firefox allows"):
+            build_browser.bookmark_url("é" * 11000)
+
     def test_draft_lookup_uses_release_id_not_published_tag_endpoint(self):
         with patch.object(release, "gh", return_value='{"databaseId":123}') as cli:
             with patch.object(release, "api", return_value={"draft": True}) as api:
