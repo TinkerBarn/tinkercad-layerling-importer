@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Explicit partial export
+
+- Keep export all-or-nothing by default when Tinkercad cannot evaluate geometry.
+- Offer an explicit choice to continue after the first geometry failure.
+- Omit failed parts and any affected Boolean group, and report the error count.
+
 ## 0.2.4 — Preview — 23 October 2026
 
 - Fix Firefox bookmark installation by minifying the self-contained bookmark below its 65,536-character saved-URL limit. Version 0.2.3 exceeded this limit.
