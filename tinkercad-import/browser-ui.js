@@ -310,11 +310,19 @@
         view.failureChoices.hidden = true;
         view.stopOnFailure.removeEventListener("click", stop);
         view.continueOnFailure.removeEventListener("click", proceed);
+        view.continueOnFailure.removeEventListener("click", confirm);
         controller.signal.removeEventListener("abort", aborted);
         resolve(shouldContinue);
       };
       const stop = () => controller.abort();
-      const proceed = () => finish(true);
+      const confirm = () => finish(true);
+      const proceed = () => {
+        view.stopOnFailure.textContent = "Cancel export";
+        view.continueOnFailure.textContent = "Continue anyway";
+        progress("Warning: continuing may create an invalid .lyl file that Layerling cannot open. Do you really want to continue without the failed parts?");
+        view.stopOnFailure.focus();
+        view.continueOnFailure.addEventListener("click", confirm, {once:true});
+      };
       const aborted = () => finish(false);
       view.failureChoices.hidden = false;
       view.stopOnFailure.addEventListener("click", stop, {once:true});
