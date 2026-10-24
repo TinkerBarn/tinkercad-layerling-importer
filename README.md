@@ -29,6 +29,8 @@ To update, replace the saved bookmark from the new installer. Existing bookmarks
 
 Evaluated triangle geometry, colors, grouping, visibility, and boolean operands are retained. Parts are editable meshes; original parametric sketches are not recovered. Missing evaluated geometry stops conversion instead of producing a partial project. Large designs require available browser memory.
 
+Spatial notes retain text and positions within the [documented note limits](tinkercad-import/README.md#verification-and-limits). Older JSON captures that omitted notes need to be captured again.
+
 Capture reads the open design without modifying it. Conversion stays in your browser; the importer does not upload designs. GitHub hosts the installer and has its own hosting logs. This unofficial preview uses Tinkercad's undocumented editor tools, which can change. It is not affiliated with Autodesk or Layerling.
 
 See [compatibility and checks](docs/browser-release-checks.md). Report problems through [GitHub Issues](https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml); include the version, browser, operating system and error. Do not attach a private design.

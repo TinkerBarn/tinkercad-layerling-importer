@@ -15,7 +15,7 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
-Current published preview is v0.2.4. The self-contained bookmark is 59,713 characters and builds enforce Firefox's 65,536-character URL limit. All 88 local checks and four corrected Windows/Linux CI jobs pass; release assets and HTTPS hosting have been verified. Live Firefox export and the Layerling editing round trip remain unverified. Earlier entries below are historical evidence.
+Current published preview is v0.2.5, with empty-placeholder evaluation and spatial notes. The self-contained bookmark is 62,035 characters, below Firefox's enforced 65,536 limit. All 96 local regression checks and four Windows/Linux CI jobs pass. Public ZIPs and all five hosted files match audited assets. Actual Layerling reader/writer note save/reopen passes under Node; visual browser checks and the reporter's Volvo retry remain outstanding. Earlier entries below are historical evidence.
 
 Version 0.2.3 is in development for large-design failures. Fixed mixed geometry-evaluation completion contracts, added Cancel and a bounded scrollable panel, stopped at first capture failure, and removed intermediate mesh arrays. User reports successful capture of the supplied Kyogre reproduction. Added lossless native browser ZIP compression with STORE fallback; verified all 145 entries of its 115,366,065-byte download remain identical in a 20,575,980-byte archive written by the new ZIP writer under Node. 37 Node and 14 Python tests pass. Eighteen synthetic assemblies plus the private reference retain exact mesh bytes and zero stored vertex error. Nothing published.
 
@@ -238,3 +238,36 @@ Build follow-up: Linux freshness CI exposed Windows locale encoding of minifier 
 Version 0.2.4 preview is published at https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/tag/v0.2.4 and deployed at https://taylormadearmy.github.io/tinkercad-layerling-importer/ . Source commit 122c316fb4173cace5bcbd6bbfcbc3fa15210238. All 38 source files match tagged Git bytes; both ZIP external hashes/allowlists/CRC and all five hosted-file comparisons pass. The main bookmark remains self-contained and no native-shape conversion was added.
 
 Reporter reply: https://github.com/henmedia/layerling/discussions/683#discussioncomment-19145027 . Await the actual Chrome error and JSON report; no Chrome export diagnosis is established by the missing email attachment. Final live Firefox installation/export and Layerling Open/Insert/Ungroup/save/reopen checks remain outstanding.
+
+## Geometry readiness and spatial notes maintenance candidate — 24 October 2026
+
+### Status
+- User authorized a separate maintenance worktree based on published v0.2.4 source 122c316. This branch contains only the geometry-readiness and notes changes; experimental native conversion remains in the original development checkout. Version 0.2.5 is now published; see the release result below.
+- Empty position/index placeholders now enter the existing bounded, cancellable evaluator path. Completed empty results fail explicitly without removing parts or operands.
+- Direct and saved-JSON capture include spatial note text and world positions. Browser and Python converters emit Layerling scene notes with the same coordinate mapping as geometry. Invalid notes and reader note/text limits fail explicitly. Split exports assign each note once to the nearest original root, including further subdivision.
+
+### Findings
+- Focused tests failed before implementation with Invalid triangle positions, missing notes and missing rejection of over-limit notes. Initial fixed suite passed 68 Node and 16 Python regressions; 19 eager/lazy parity assemblies retain exact mesh bytes.
+- An independent local test uses the actual Layerling reader and writer from upstream checkout 99e8d211. Single and split project notes retain text, IDs and coordinates through open/save/reopen. This is a Node file round trip, not visual browser verification.
+- Captured Tinkercad notes are world-space informational text, not geometric bodies or source-body anchors. New notes open as collapsed pins. Layerling currently normalizes at most 200 notes and 2,000 UTF-16 code units per note; exporter refuses loss instead of relying on truncation. Older JSON captures without notes cannot recover them.
+
+### TODO
+- [x] Finish final regressions, parity, package integrity/extracted-source checks and self-review. All 69 Node, 16 Python and eleven release regressions pass. Nineteen eager/lazy parity assemblies preserve exact mesh bytes. Bookmark URL is 62,035 characters, below the enforced 65,536 limit. Source/browser packages pass allowlist, checksum and CRC checks, including portable checks from extracted source.
+- [ ] Verify actual Tinkercad Honeycomb recovery with reporter's shared/minimal example and visual note capture/open/save/reopen in a browser. Do not claim the Volvo design fixed from synthetic tests.
+- User explicitly requested commit and release, then authorized a discussion reply. Preparing this maintenance candidate for CI and the existing verified-assets publication workflow. Reply only after checking the hosted result; retain the actual-Volvo and visual-browser verification limits.
+
+
+## v0.2.5 release result — 24 October 2026
+
+### Status
+- Source commit a36797e643edc1bd0d4a1d2ceb9df4cec7a00dd3 is published as v0.2.5 preview and deployed to GitHub Pages. All four CI jobs passed (40107507991), draft preparation succeeded (40107636578), and publication/deployment succeeded (40107766742).
+- Posted the requested reply as taylormadearmy: https://github.com/henmedia/layerling/discussions/683#discussioncomment-19166225 . GitHub returned the exact expected body, author and permalink.
+
+### Findings
+- All 38 draft source files equal exact committed Git bytes; internal/external checksums, allowlists and ZIP CRCs pass. Unauthenticated downloads of both public ZIPs match those assets, and all five hosted files match the browser ZIP. Source, issue and release links respond successfully.
+- Windows working-tree VERSION had CRLF while Git and Linux-produced source assets use LF. Asset audit compared exact Git blobs rather than treating checkout line-ending conversion as a release mismatch.
+
+### TODO
+- [x] Commit/push the maintenance changes, pass CI, audit draft assets, publish/deploy and check public HTTPS delivery.
+- [x] Post the authorized reporter reply after delivery verification.
+- [ ] Obtain the reporter's actual Honeycomb retry and complete visual browser note checks before expanding compatibility claims.

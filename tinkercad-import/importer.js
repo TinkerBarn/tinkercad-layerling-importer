@@ -81,9 +81,22 @@
     const state = doc.states.find(s => s.id === doc.sceneStateId);
     const nodes = state.nodes.filter(n => ids.has(n.nodeId));
     const objects = new Set(nodes.map(n => n.objectId));
+    // Notes have world positions, not source-body anchors. Assign each once to
+    // its nearest original root, even when an assembly is subdivided again.
+    const byId = new Map(state.nodes.map(n => [n.nodeId,n]));
+    const roots = new Set(part.rootIds);
+    const notes = (state.notes || []).filter(note => {
+      let nearest, distance = Infinity;
+      for (const id of state.rootNodeIds) {
+        const d = byId.get(id).definition;
+        const value = Math.hypot(note.x-d.x,note.y-d.elevation,note.z-d.z);
+        if (nearest === undefined || value < distance) {nearest=id;distance=value;}
+      }
+      return roots.has(nearest);
+    });
     return {...doc, metadata:{...doc.metadata,projectName:name},
       assets:doc.assets.filter(a => assets.has(a.id)),
-      states:[{...state,rootNodeIds:part.rootIds,nodes}],
+      states:[{...state,rootNodeIds:part.rootIds,nodes,...(state.notes ? {notes} : {})}],
       history:{entries:[{stateId:state.id,selectedObjectIds:[],recordedAt:doc.metadata.createdAt}],index:0},
       features:doc.features.filter(f => objects.has(f.outputObjectId)),
       groups:doc.groups.filter(g => ids.has(g.nodeId))};
@@ -95,6 +108,17 @@
 (function (root) {
   "use strict";
   const MIN_SIZE = 0.05;
+  function convertNotes(notes = []) {
+    if (!Array.isArray(notes) || notes.length > 200)
+      throw Error("Layerling supports at most 200 notes per project; export stopped to avoid losing notes.");
+    return notes.map((note, i) => {
+      if (typeof note?.content !== "string" || note.content.length > 2000 ||
+          ![note.position?.x,note.position?.y,note.position?.z].every(v => typeof v === "number" && Number.isFinite(v)))
+        throw Error(`Note ${i+1} has invalid text/position or exceeds Layerling's 2,000-character limit; export stopped to avoid losing notes.`);
+      return {id:`tinkercad-note-${i+1}`,text:note.content,x:note.position.x,
+        y:note.position.z,z:-note.position.y,collapsed:true};
+    });
+  }
   function unionBounds(shapes) {
     const result = [
       Infinity,
@@ -425,6 +449,7 @@
       meshes = input?.meshes || {};
     if (!Array.isArray(nodes))
       throw Error("The selected file is not a Tinkercad export.");
+    const notes = convertNotes(input?.notes);
     if (input.format && input.format !== "tinkercad-evaluated-world-v1")
       throw Error(
         "Unsupported capture format; export again with the current bookmark.",
@@ -834,7 +859,7 @@
       },
       assets,
       sceneStateId: "scene",
-      states: [{ id: "scene", rootNodeIds: rootIds, nodes: stateNodes }],
+      states: [{ id: "scene", rootNodeIds: rootIds, nodes: stateNodes, ...(notes.length ? {notes} : {}) }],
       history: {
         entries: [{ stateId: "scene", selectedObjectIds: [], recordedAt: now }],
         index: 0,
@@ -913,6 +938,7 @@
         files.push(["assemblies.json",JSON.stringify(manifest,null,2)], ["README.txt",
           "Extract this transport ZIP first; it may exceed 512 MiB. Only the numbered .lyl files pass the known per-project reader limits. Each construction group and original position is retained.\n"+
           "These are separate projects. To combine them, use Layerling Import / Insert design; this path is source-inspected but not live verified.\n"+
+          "Each spatial note is included once, with the nearest original construction-root centre. Its world position is unchanged.\n"+
           "Files in needs-attention are NOT importable under the current Layerling reader limits. They preserve complete construction data, but require a reader limit change or a different assembly structure. Renaming them does not fix the limit. No operands were removed.\n"+
           "Targets are estimates of expanded mesh data, triangle and part counts, not guaranteed file sizes or Layerling memory limits.\n"+
           "Assemblies marked oversized in assemblies.json contain an indivisible construction group that exceeds a target. No operands were removed or flattened.\n"]);
@@ -1011,7 +1037,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
-  let shapes;
+  let shapes, notes = [];
   const roots = [...testKit.sceneModel.children.values()];
   const compactMetadata = lazy && roots.every(node =>
     node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
@@ -1020,6 +1046,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       typeof node.data.params?.get === "function"));
   if (compactMetadata) {
     onDiagnostic({phase:"compact-metadata"});
+    notes = testKit.editorData?.notes?.values?.() || [];
     let visited = 0;
     const read = async scene => {
       cancelled();
@@ -1093,8 +1120,12 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     });
     const payload = result?.content?.[0]?.json || result?.json || result;
     shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
+    notes = payload?.notes || [];
   }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  if (!Array.isArray(notes)) throw new Error("Tinkercad did not return a notes list.");
+  notes = notes.map(note => ({uuid:note?.uuid, content:note?.content,
+    position:note?.position && {x:note.position.x,y:note.position.y,z:note.position.z}}));
   cancelled();
   const sceneNodes = new Map(), seen = new Set();
   function visit(node) {
@@ -1126,9 +1157,13 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
   const observedBuffers = new WeakSet();
   let observedGeometryBytes = 0, evaluationsStarted = 0;
   async function geometryFor(sn, node) {
+    const hasTriangles = geometry => geometry?.attributes?.position?.count > 0 &&
+      (!geometry.index || geometry.index.count > 0);
+    const empty = geometry => geometry?.attributes?.position && !hasTriangles(geometry);
+    const emptyError = () => new Error("Evaluated geometry is empty (no triangles). Export stopped without removing this part or its operands.");
     const ready = sn.geometry?.get?.();
-    if (ready?.attributes?.position) return ready;
-    if (typeof sn.evaluate !== "function") throw new Error("Missing geometry evaluator");
+    if (hasTriangles(ready)) return ready;
+    if (typeof sn.evaluate !== "function") throw empty(ready) ? emptyError() : new Error("Missing geometry evaluator");
     onDiagnostic({phase:"evaluate", evaluationsStarted:++evaluationsStarted});
     onProgress(`Waiting for geometry: ${node.tags?.label || node.params?.id || node.versions_id}`);
     return new Promise((resolve, reject) => {
@@ -1158,10 +1193,11 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
         if (signal?.aborted) return abort();
         try {
           const geometry = sn.geometry?.get?.();
-          if (geometry?.attributes?.position) {
+          if (hasTriangles(geometry)) {
             evaluationDiagnostic("evaluation-ready");
             return finish(null, geometry);
           }
+          if (empty(geometry) && (promiseSettled || callbackReceived)) return finish(emptyError());
           const elapsed = Date.now() - started;
           if (elapsed - lastProgress >= 5000) {
             lastProgress = elapsed;
@@ -1173,7 +1209,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       };
       timeout = setTimeout(() => {
         evaluationDiagnostic("evaluation-timeout");
-        finish(new Error("Geometry evaluation timed out after 120 seconds"));
+        finish(new Error("Geometry evaluation timed out after 120 seconds; no non-empty triangle geometry became available"));
       }, limit);
       signal?.addEventListener("abort", abort, {once: true});
       if (signal?.aborted) return abort();
@@ -1295,7 +1331,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     if (captured % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
   }
   if (lazy) {
-    return {format:"tinkercad-evaluated-world-v1", shapes, meshes, failures, readMesh: async id => {
+    return {format:"tinkercad-evaluated-world-v1", shapes, meshes, notes, failures, readMesh: async id => {
       cancelled();
       const node = sourceNodes.get(id);
       if (!node) throw new Error("Missing source shape: " + id);
@@ -1309,11 +1345,11 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
   }
   for (const node of shapes) await capture(node);
   cancelled();
-  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
+  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, notes, diagnostics};
   if (download) {
     const blob = new Blob([
       '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
-      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics, cancelled), '}'
+      ',"meshes":{', ...meshParts, '},"notes":', await tinkercadJsonBlob(notes, cancelled), ',"diagnostics":', await tinkercadJsonBlob(diagnostics, cancelled), '}'
     ], {type:"application/json"});
     cancelled();
     const url = URL.createObjectURL(blob);
@@ -1363,7 +1399,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
 /* Shared browser download controls and the Tinkercad bookmark entry point. */
 (function (root) {
   "use strict";
-  const VERSION = "0.2.4";
+  const VERSION = "0.2.5";
   const SITE = "https://taylormadearmy.github.io/tinkercad-layerling-importer/";
   root.layerlingImporterVersion = VERSION;
   const sizeLabel = bytes => bytes >= 1024**3 ? `${(bytes/1024**3).toFixed(2)} GiB` : `${(bytes/1024**2).toFixed(1)} MiB`;

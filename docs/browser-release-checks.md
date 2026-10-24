@@ -1,8 +1,14 @@
 # Compatibility and release checks
 
+## Version 0.2.5 checks, 24 October 2026
+
+Version 0.2.5 preview was published on 24 October 2026. It adds empty-placeholder evaluation and spatial notes, without experimental native-shape conversion. All 69 Node, 16 Python and eleven release regressions pass. Nineteen synthetic assemblies match browser and Python documents and exact mesh bytes in eager and lazy modes. Both packages pass integrity and allowlist checks, and the source package passes its portable checks after extraction. The bookmark URL is 62,035 characters.
+
+A separate local test used Layerling's actual reader and writer at `99e8d21139d07ac4109dc3b74ed6333c04a45e16`. Note text, IDs and world coordinates survive open, save and reopen for one complete project and its split projects. This test runs in Node. Visual browser checks and the reporter's actual Honeycomb Grid retry remain outstanding.
+
 ## Support level
 
-Version 0.2.4 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
+Version 0.2.5 is a preview for desktop browsers. A user has reported successful direct conversion. Automated checks run on Windows and Linux; they do not establish Safari, Firefox or mobile compatibility. Browser-engine and Layerling save/reopen checks must be recorded separately below as they are completed.
 
 The bookmark uses modern JavaScript, Web Crypto, Blob downloads and Tinkercad's undocumented editor tools. Browser policies can block bookmark installation, console pasting or automatic downloads. A persistent download link is provided when automatic download does not start. Large designs depend on available memory.
 

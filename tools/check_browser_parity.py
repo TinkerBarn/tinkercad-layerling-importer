@@ -86,6 +86,8 @@ def fixtures():
     add("reversed-winding", [group("bundle", [leaf("a"), leaf("b")], bundle=True)], {"a": mesh(), "b": backwards})
     add("source-hidden", [group("bundle", [leaf("a", visible=False), leaf("b")], bundle=True, visible=False)], {"a": mesh(), "b": mesh()})
     add("preview", [leaf("preview", preview=True), leaf("part")], {"part": mesh()})
+    add("spatial-notes", [leaf("part")], {"part":mesh()})
+    cases[-1]["input"]["notes"] = [{"uuid":"n", "content":"Fit 🟢\nKeep spaces ", "position":{"x":12.25,"y":-3.5,"z":8}}]
     return cases
 
 
@@ -131,7 +133,7 @@ def main():
             converter = Converter(case["input"]["meshes"])
             shapes, nodes, features, groups, sketches = converter.convert(case["input"]["shapes"])
             roots = ["scene/object/" + shape["id"] for shape in shapes]
-            expected = build_document(case["name"], nodes, roots, features, groups, sketches, converter._assets, shapes)
+            expected = build_document(case["name"], nodes, roots, features, groups, sketches, converter._assets, shapes, case["input"].get("notes", []))
             for suffix in ("", "-lazy"):
                 with zipfile.ZipFile(folder / (case["name"] + suffix + ".lyl")) as archive:
                     assert archive.testzip() is None, case["name"] + ": invalid ZIP CRC"

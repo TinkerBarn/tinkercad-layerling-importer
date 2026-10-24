@@ -502,11 +502,28 @@ def scene_bounds(shapes: list[dict]) -> tuple[float, float, float, float]:
     return bounds[0], bounds[1], bounds[4], bounds[5]
 
 
-def build_document(name: str, state_nodes: list[dict], root_ids: list[str], features: list[dict], groups: list[dict], sketches: list[dict], assets: list[dict], shapes: list[dict]) -> dict:
+def convert_notes(notes: list[dict]) -> list[dict]:
+    if not isinstance(notes, list) or len(notes) > 200:
+        raise ValueError("Layerling supports at most 200 notes per project; export stopped to avoid losing notes.")
+    result = []
+    for i, note in enumerate(notes):
+        text = note.get("content") if isinstance(note, dict) else None
+        position = note.get("position") if isinstance(note, dict) else None
+        values = [position.get(k) for k in ("x", "y", "z")] if isinstance(position, dict) else []
+        if (not isinstance(text, str) or len(text.encode("utf-16-le", errors="surrogatepass")) > 4000
+                or len(values) != 3 or any(type(v) not in (int, float) or not math.isfinite(v) for v in values)):
+            raise ValueError(f"Note {i+1} has invalid text/position or exceeds Layerling's 2,000-character limit; export stopped to avoid losing notes.")
+        x, y, z = values
+        result.append({"id":f"tinkercad-note-{i+1}", "text":text, "x":x, "y":z, "z":-y, "collapsed":True})
+    return result
+
+
+def build_document(name: str, state_nodes: list[dict], root_ids: list[str], features: list[dict], groups: list[dict], sketches: list[dict], assets: list[dict], shapes: list[dict], notes: list[dict] | None = None) -> dict:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     min_x, max_x, min_z, max_z = scene_bounds(shapes)
     span = max(200.0, max_x - min_x + 40, max_z - min_z + 40, abs(min_x) * 2 + 40, abs(max_x) * 2 + 40, abs(min_z) * 2 + 40, abs(max_z) * 2 + 40)
     plate = int(math.ceil(span / 10.0) * 10)
+    scene_notes = convert_notes([] if notes is None else notes)
     return {
         "schema": SCHEMA,
         "formatVersion": FORMAT_VERSION,
@@ -520,7 +537,7 @@ def build_document(name: str, state_nodes: list[dict], root_ids: list[str], feat
         },
         "assets": assets,
         "sceneStateId": "scene",
-        "states": [{"id": "scene", "rootNodeIds": root_ids, "nodes": state_nodes}],
+        "states": [{"id": "scene", "rootNodeIds": root_ids, "nodes": state_nodes, **({"notes":scene_notes} if scene_notes else {})}],
         "history": {"entries": [{"stateId": "scene", "selectedObjectIds": [], "recordedAt": now}], "index": 0},
         "sketches": sketches,
         "features": features,
@@ -557,12 +574,14 @@ def write_lyl(path: Path, document: dict, blobs: dict[str, bytes], assets: list[
             archive.writestr(by_id[asset_id]["path"], blob)
 
 
-def load_input(path: Path) -> tuple[list[dict], dict]:
-    data = json.loads(path.read_text())
+def load_input(path: Path) -> tuple[list[dict], dict, list[dict]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(data, list):
-        return data, {}
+        return data, {}, []
     if isinstance(data, dict) and isinstance(data.get("shapes"), list):
-        return data["shapes"], data.get("meshes") or {}
+        notes = data.get("notes", [])
+        convert_notes(notes)
+        return data["shapes"], data.get("meshes") or {}, notes
     raise SystemExit(f"{path} is not a Tinkercad shape tree.")
 
 
@@ -584,7 +603,7 @@ def main() -> None:
     parser.add_argument("-o", "--output", type=Path, required=True, help="Where to write the .lyl file")
     parser.add_argument("--name", help="Project name. Defaults to the output file name.")
     args = parser.parse_args()
-    nodes, meshes = load_input(args.source)
+    nodes, meshes, notes = load_input(args.source)
     converter = Converter(meshes)
     shapes, state_nodes, features, groups, sketches = converter.convert(nodes)
     root_ids = []
@@ -594,7 +613,7 @@ def main() -> None:
     root_ids = [node["nodeId"] for node in state_nodes if node["nodeId"] not in child_ids]
     # Features were built with the convert() root order. Rebuild so they match root_ids.
     features, groups, sketches = converter._indexes(root_ids, {node["nodeId"]: node for node in state_nodes})
-    document = build_document(args.name or args.output.stem, state_nodes, root_ids, features, groups, sketches, converter._assets, shapes)
+    document = build_document(args.name or args.output.stem, state_nodes, root_ids, features, groups, sketches, converter._assets, shapes, notes)
     write_lyl(args.output, document, converter._asset_blobs, converter._assets)
     print(f"Wrote {args.output}")
     print("Shapes:", ", ".join(f"{count} {name}" for name, count in converter.counts.items() if count))

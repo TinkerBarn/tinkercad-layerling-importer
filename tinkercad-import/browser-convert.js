@@ -3,6 +3,17 @@
 (function (root) {
   "use strict";
   const MIN_SIZE = 0.05;
+  function convertNotes(notes = []) {
+    if (!Array.isArray(notes) || notes.length > 200)
+      throw Error("Layerling supports at most 200 notes per project; export stopped to avoid losing notes.");
+    return notes.map((note, i) => {
+      if (typeof note?.content !== "string" || note.content.length > 2000 ||
+          ![note.position?.x,note.position?.y,note.position?.z].every(v => typeof v === "number" && Number.isFinite(v)))
+        throw Error(`Note ${i+1} has invalid text/position or exceeds Layerling's 2,000-character limit; export stopped to avoid losing notes.`);
+      return {id:`tinkercad-note-${i+1}`,text:note.content,x:note.position.x,
+        y:note.position.z,z:-note.position.y,collapsed:true};
+    });
+  }
   function unionBounds(shapes) {
     const result = [
       Infinity,
@@ -333,6 +344,7 @@
       meshes = input?.meshes || {};
     if (!Array.isArray(nodes))
       throw Error("The selected file is not a Tinkercad export.");
+    const notes = convertNotes(input?.notes);
     if (input.format && input.format !== "tinkercad-evaluated-world-v1")
       throw Error(
         "Unsupported capture format; export again with the current bookmark.",
@@ -742,7 +754,7 @@
       },
       assets,
       sceneStateId: "scene",
-      states: [{ id: "scene", rootNodeIds: rootIds, nodes: stateNodes }],
+      states: [{ id: "scene", rootNodeIds: rootIds, nodes: stateNodes, ...(notes.length ? {notes} : {}) }],
       history: {
         entries: [{ stateId: "scene", selectedObjectIds: [], recordedAt: now }],
         index: 0,
@@ -821,6 +833,7 @@
         files.push(["assemblies.json",JSON.stringify(manifest,null,2)], ["README.txt",
           "Extract this transport ZIP first; it may exceed 512 MiB. Only the numbered .lyl files pass the known per-project reader limits. Each construction group and original position is retained.\n"+
           "These are separate projects. To combine them, use Layerling Import / Insert design; this path is source-inspected but not live verified.\n"+
+          "Each spatial note is included once, with the nearest original construction-root centre. Its world position is unchanged.\n"+
           "Files in needs-attention are NOT importable under the current Layerling reader limits. They preserve complete construction data, but require a reader limit change or a different assembly structure. Renaming them does not fix the limit. No operands were removed.\n"+
           "Targets are estimates of expanded mesh data, triangle and part counts, not guaranteed file sizes or Layerling memory limits.\n"+
           "Assemblies marked oversized in assemblies.json contain an indivisible construction group that exceeds a target. No operands were removed or flattened.\n"]);

@@ -135,6 +135,30 @@ const mesh = (x) => ({
   normals: [0, -0.8, 0.6, 0, -0.8, 0.6, 0, -0.8, 0.6],
 });
 
+test("spatial notes preserve Unicode and world positions in single and split projects", async () => {
+  const c=context(), input={shapes:[leaf("a"),leaf("b")],meshes:{a:mesh(0),b:mesh(100)},notes:[
+    {uuid:"a",content:"Fit 🟢\nDo not trim ",position:{x:1,y:2,z:3}},
+    {uuid:"b",content:"Far note",position:{x:101,y:2,z:3}}]};
+  const unpack=bytes=>JSON.parse(new TextDecoder().decode(readStoredZip(bytes).get("project.json")));
+  const doc=unpack(new Uint8Array(await (await c.convertTinkercadToLayerling(input)).arrayBuffer()));
+  assert.deepEqual(doc.states[0].notes.map(n=>[n.text,n.x,n.y,n.z]),[[input.notes[0].content,1,3,-2],["Far note",101,3,-2]]);
+  const bundle=await c.convertTinkercadToLayerling(input,"Notes",{output:"assemblies",assemblyLimits:{nodes:1}});
+  const files=readStoredZip(new Uint8Array(await bundle.arrayBuffer()));
+  const parts=[...files].filter(([name])=>name.endsWith(".lyl")).map(([,bytes])=>unpack(bytes));
+  assert.equal(parts.length,2);
+  assert.deepEqual(parts.flatMap(p=>p.states[0].notes||[]).sort((a,b)=>a.x-b.x),doc.states[0].notes);
+  assert.ok(parts.every(p=>p.states[0].notes.length===1));
+});
+
+test("unsupported notes fail before geometry instead of silently losing text", async () => {
+  const valid={content:"Text",position:{x:0,y:0,z:0}};
+  for(const notes of [[{...valid,content:"x".repeat(2001)}],Array(201).fill(valid),[{...valid,position:{x:NaN,y:0,z:0}}],{}]) {
+    let reads=0;
+    await assert.rejects(context().convertTinkercadToLayerling({shapes:[leaf("a")],notes,readMesh:async()=>{reads++;return mesh(0);}}),/note/i);
+    assert.equal(reads,0);
+  }
+});
+
 test("lazy conversion reads one mesh at a time and compresses before requesting the next", async () => {
   let active = false, compressed = 0;
   const reads = [];
@@ -812,15 +836,20 @@ test("assemblies split further when actual reader limits are tighter than groupi
   c.layerlingAssemblies.assess=(doc,json,size)=>assess(doc,json,size,{...c.layerlingAssemblies.readerLimits,entries:2});
   const a=mesh(0),b=mesh(10);b.positions[3]+=1;
   let output;
-  const blob=await c.convertTinkercadToLayerling({shapes:[leaf("a"),leaf("b")],meshes:{a,b}},"Extra split",{
+  const blob=await c.convertTinkercadToLayerling({shapes:[leaf("a"),leaf("b")],meshes:{a,b},
+    notes:[{content:"Once",position:{x:10,y:0,z:0}}]},"Extra split",{
     output:"assemblies",onOutput:v=>{output=v;}});
   assert.equal(output.assemblies,2);assert.equal(output.importable,2);assert.equal(output.blocked,0);
   const files=readStoredZip(new Uint8Array(await blob.arrayBuffer()));
   const manifest=JSON.parse(new TextDecoder().decode(files.get("assemblies.json")));
+  const notes=[];
   for(const p of manifest.parts) {
     assert.equal(p.importable,true);assert.deepEqual(p.issues,[]);
     assert.equal(readStoredZip(files.get(p.file)).size,2);
+    const doc=JSON.parse(new TextDecoder().decode(readStoredZip(files.get(p.file)).get("project.json")));
+    notes.push(...doc.states[0].notes || []);
   }
+  assert.equal(notes.length,1);assert.equal(notes[0].text,"Once");
 });
 
 test("an indivisible over-limit construction is preserved separately without posing as an importable project", async () => {

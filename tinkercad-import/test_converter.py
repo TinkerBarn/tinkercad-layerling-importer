@@ -7,7 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from convert import Converter, build_document, encode_mesh, to_y_up, write_lyl
+from convert import Converter, build_document, convert_notes, encode_mesh, load_input, to_y_up, write_lyl
 
 
 def leaf(id, **tags):
@@ -20,6 +20,23 @@ def mesh(x=0):
 
 
 class ConverterTests(unittest.TestCase):
+    def test_spatial_notes_preserve_text_and_world_coordinates(self):
+        source = [{"uuid":"n", "content":"Fit 🟢\nKeep spaces ", "position":{"x":1,"y":2,"z":3}}]
+        c = Converter({"part": mesh()})
+        shapes, nodes, features, groups, sketches = c.convert([leaf("part")])
+        doc = build_document("Notes", nodes, [nodes[0]["nodeId"]], features, groups, sketches, c._assets, shapes, source)
+        self.assertEqual(doc["states"][0]["notes"], [{"id":"tinkercad-note-1", "text":source[0]["content"], "x":1,"y":3,"z":-2,"collapsed":True}])
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as folder:
+            path = Path(folder) / "capture.json"
+            path.write_text(json.dumps({"shapes":[leaf("part")],"meshes":{"part":mesh()},"notes":source}), encoding="utf-8")
+            self.assertEqual(load_input(path)[2], source)
+
+    def test_notes_reject_loss_instead_of_truncating(self):
+        note = {"content":"Keep", "position":{"x":0,"y":0,"z":0}}
+        for notes in ([{**note,"content":"🟢"*1001}], [note]*201, [{**note,"position":{"x":True,"y":0,"z":0}}], {}):
+            with self.assertRaisesRegex(ValueError, "[Nn]ote"):
+                convert_notes(notes)
+
     def test_reversed_winding_surfaces_are_not_duplicates(self):
         for normals in (True, False):
             a, b = mesh(), mesh()

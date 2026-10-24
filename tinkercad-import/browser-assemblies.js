@@ -81,9 +81,22 @@
     const state = doc.states.find(s => s.id === doc.sceneStateId);
     const nodes = state.nodes.filter(n => ids.has(n.nodeId));
     const objects = new Set(nodes.map(n => n.objectId));
+    // Notes have world positions, not source-body anchors. Assign each once to
+    // its nearest original root, even when an assembly is subdivided again.
+    const byId = new Map(state.nodes.map(n => [n.nodeId,n]));
+    const roots = new Set(part.rootIds);
+    const notes = (state.notes || []).filter(note => {
+      let nearest, distance = Infinity;
+      for (const id of state.rootNodeIds) {
+        const d = byId.get(id).definition;
+        const value = Math.hypot(note.x-d.x,note.y-d.elevation,note.z-d.z);
+        if (nearest === undefined || value < distance) {nearest=id;distance=value;}
+      }
+      return roots.has(nearest);
+    });
     return {...doc, metadata:{...doc.metadata,projectName:name},
       assets:doc.assets.filter(a => assets.has(a.id)),
-      states:[{...state,rootNodeIds:part.rootIds,nodes}],
+      states:[{...state,rootNodeIds:part.rootIds,nodes,...(state.notes ? {notes} : {})}],
       history:{entries:[{stateId:state.id,selectedObjectIds:[],recordedAt:doc.metadata.createdAt}],index:0},
       features:doc.features.filter(f => objects.has(f.outputObjectId)),
       groups:doc.groups.filter(g => ids.has(g.nodeId))};
