@@ -1302,6 +1302,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       const name = node.tags?.label || node.params?.id || id;
       onProgress(`Reading geometry: ${name}…`);
       const mesh = await captureMesh(node);
+      if (!mesh) return null;
       onProgress(`Read ${(mesh.positions.length / 9).toLocaleString()} triangles: ${name}`);
       return mesh;
     }};
