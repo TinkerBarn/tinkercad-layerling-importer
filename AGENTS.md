@@ -238,3 +238,20 @@ Build follow-up: Linux freshness CI exposed Windows locale encoding of minifier 
 Version 0.2.4 preview is published at https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/tag/v0.2.4 and deployed at https://taylormadearmy.github.io/tinkercad-layerling-importer/ . Source commit 122c316fb4173cace5bcbd6bbfcbc3fa15210238. All 38 source files match tagged Git bytes; both ZIP external hashes/allowlists/CRC and all five hosted-file comparisons pass. The main bookmark remains self-contained and no native-shape conversion was added.
 
 Reporter reply: https://github.com/henmedia/layerling/discussions/683#discussioncomment-19145027 . Await the actual Chrome error and JSON report; no Chrome export diagnosis is established by the missing email attachment. Final live Firefox installation/export and Layerling Open/Insert/Ungroup/save/reopen checks remain outstanding.
+
+## Geometry readiness and spatial notes maintenance candidate — 24 October 2026
+
+### Status
+- User authorized a separate maintenance worktree based on published v0.2.4 source 122c316. This branch contains only the geometry-readiness and notes changes; experimental native conversion remains in the original development checkout. Local candidate version is 0.2.5, not published.
+- Empty position/index placeholders now enter the existing bounded, cancellable evaluator path. Completed empty results fail explicitly without removing parts or operands.
+- Direct and saved-JSON capture include spatial note text and world positions. Browser and Python converters emit Layerling scene notes with the same coordinate mapping as geometry. Invalid notes and reader note/text limits fail explicitly. Split exports assign each note once to the nearest original root, including further subdivision.
+
+### Findings
+- Focused tests failed before implementation with Invalid triangle positions, missing notes and missing rejection of over-limit notes. Initial fixed suite passed 68 Node and 16 Python regressions; 19 eager/lazy parity assemblies retain exact mesh bytes.
+- An independent local test uses the actual Layerling reader and writer from upstream checkout 99e8d211. Single and split project notes retain text, IDs and coordinates through open/save/reopen. This is a Node file round trip, not visual browser verification.
+- Captured Tinkercad notes are world-space informational text, not geometric bodies or source-body anchors. New notes open as collapsed pins. Layerling currently normalizes at most 200 notes and 2,000 UTF-16 code units per note; exporter refuses loss instead of relying on truncation. Older JSON captures without notes cannot recover them.
+
+### TODO
+- [x] Finish final regressions, parity, package integrity/extracted-source checks and self-review. All 69 Node, 16 Python and eleven release regressions pass. Nineteen eager/lazy parity assemblies preserve exact mesh bytes. Bookmark URL is 62,035 characters, below the enforced 65,536 limit. Source/browser packages pass allowlist, checksum and CRC checks, including portable checks from extracted source.
+- [ ] Verify actual Tinkercad Honeycomb recovery with reporter's shared/minimal example and visual note capture/open/save/reopen in a browser. Do not claim the Volvo design fixed from synthetic tests.
+- User explicitly requested commit and release, then authorized a discussion reply. Preparing this maintenance candidate for CI and the existing verified-assets publication workflow. Reply only after checking the hosted result; retain the actual-Volvo and visual-browser verification limits.

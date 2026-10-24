@@ -154,7 +154,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
-  let shapes;
+  let shapes, notes = [];
   const roots = [...testKit.sceneModel.children.values()];
   const compactMetadata = lazy && roots.every(node =>
     node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
@@ -163,6 +163,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       typeof node.data.params?.get === "function"));
   if (compactMetadata) {
     onDiagnostic({phase:"compact-metadata"});
+    notes = testKit.editorData?.notes?.values?.() || [];
     let visited = 0;
     const read = async scene => {
       cancelled();
@@ -236,8 +237,12 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     });
     const payload = result?.content?.[0]?.json || result?.json || result;
     shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
+    notes = payload?.notes || [];
   }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  if (!Array.isArray(notes)) throw new Error("Tinkercad did not return a notes list.");
+  notes = notes.map(note => ({uuid:note?.uuid, content:note?.content,
+    position:note?.position && {x:note.position.x,y:note.position.y,z:note.position.z}}));
   cancelled();
   const sceneNodes = new Map(), seen = new Set();
   function visit(node) {
@@ -268,9 +273,13 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
   const observedBuffers = new WeakSet();
   let observedGeometryBytes = 0, evaluationsStarted = 0;
   async function geometryFor(sn, node) {
+    const hasTriangles = geometry => geometry?.attributes?.position?.count > 0 &&
+      (!geometry.index || geometry.index.count > 0);
+    const empty = geometry => geometry?.attributes?.position && !hasTriangles(geometry);
+    const emptyError = () => new Error("Evaluated geometry is empty (no triangles). Export stopped without removing this part or its operands.");
     const ready = sn.geometry?.get?.();
-    if (ready?.attributes?.position) return ready;
-    if (typeof sn.evaluate !== "function") throw new Error("Missing geometry evaluator");
+    if (hasTriangles(ready)) return ready;
+    if (typeof sn.evaluate !== "function") throw empty(ready) ? emptyError() : new Error("Missing geometry evaluator");
     onDiagnostic({phase:"evaluate", evaluationsStarted:++evaluationsStarted});
     onProgress(`Waiting for geometry: ${node.tags?.label || node.params?.id || node.versions_id}`);
     return new Promise((resolve, reject) => {
@@ -300,10 +309,11 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
         if (signal?.aborted) return abort();
         try {
           const geometry = sn.geometry?.get?.();
-          if (geometry?.attributes?.position) {
+          if (hasTriangles(geometry)) {
             evaluationDiagnostic("evaluation-ready");
             return finish(null, geometry);
           }
+          if (empty(geometry) && (promiseSettled || callbackReceived)) return finish(emptyError());
           const elapsed = Date.now() - started;
           if (elapsed - lastProgress >= 5000) {
             lastProgress = elapsed;
@@ -315,7 +325,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       };
       timeout = setTimeout(() => {
         evaluationDiagnostic("evaluation-timeout");
-        finish(new Error("Geometry evaluation timed out after 120 seconds"));
+        finish(new Error("Geometry evaluation timed out after 120 seconds; no non-empty triangle geometry became available"));
       }, limit);
       signal?.addEventListener("abort", abort, {once: true});
       if (signal?.aborted) return abort();
@@ -428,7 +438,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     if (captured % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
   }
   if (lazy) {
-    return {format:"tinkercad-evaluated-world-v1", shapes, meshes, readMesh: async id => {
+    return {format:"tinkercad-evaluated-world-v1", shapes, meshes, notes, readMesh: async id => {
       cancelled();
       const node = sourceNodes.get(id);
       if (!node) throw new Error("Missing source shape: " + id);
@@ -441,11 +451,11 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
   }
   for (const node of shapes) await capture(node);
   cancelled();
-  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, diagnostics};
+  const exported = {format:"tinkercad-evaluated-world-v1", shapes, meshes, notes, diagnostics};
   if (download) {
     const blob = new Blob([
       '{"format":"tinkercad-evaluated-world-v1","shapes":', shapeBlob,
-      ',"meshes":{', ...meshParts, '},"diagnostics":', await tinkercadJsonBlob(diagnostics, cancelled), '}'
+      ',"meshes":{', ...meshParts, '},"notes":', await tinkercadJsonBlob(notes, cancelled), ',"diagnostics":', await tinkercadJsonBlob(diagnostics, cancelled), '}'
     ], {type:"application/json"});
     cancelled();
     const url = URL.createObjectURL(blob);

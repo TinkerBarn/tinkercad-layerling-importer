@@ -109,6 +109,64 @@ function triangleGeometry(index = null) {
   };
 }
 
+test("empty generator placeholders are evaluated before capture", async () => {
+  for (const indexed of [false, true]) {
+    const env = environment({timers:true});
+    let ready = triangleGeometry(indexed ? {count:0} : null), calls = 0;
+    if (!indexed) ready.attributes.position.count = 0;
+    installScene(env, {geometry:{get:()=>ready}, computeWorldMatrix:()=>({determinant:()=>1}),
+      async evaluate() {calls++; ready=triangleGeometry();}}, "legacy-shapegenerator");
+    const captured=await vm.runInContext("exportTinkercadDesign({download:false})",env.context);
+    assert.equal(calls,1);
+    assert.equal(captured.meshes.part.positions.length,9);
+  }
+});
+
+test("empty callback-based geometry waits for completed triangles", async () => {
+  const env=environment({timers:true}); let ready=triangleGeometry(),calls=0;
+  ready.attributes.position.count=0;
+  installScene(env,{geometry:{get:()=>ready},computeWorldMatrix:()=>({determinant:()=>1}),
+    evaluate(callback){calls++;setTimeout(()=>{ready=triangleGeometry();callback();},5);}},"csg");
+  const captured=await vm.runInContext("exportTinkercadDesign({download:false})",env.context);
+  assert.equal(calls,1);assert.equal(captured.meshes.part.positions.length,9);
+});
+
+test("persistent empty geometry fails explicitly and pending empty capture can be cancelled", async () => {
+  for (const cancel of [false,true]) {
+    const env=environment({timers:true}), ready=triangleGeometry();
+    ready.attributes.position.count=0;
+    const controller=new AbortController(); env.context.signal=controller.signal;
+    installScene(env,{geometry:{get:()=>ready},computeWorldMatrix:()=>({determinant:()=>1}),
+      evaluate(){return cancel ? new Promise(()=>{}) : Promise.resolve();}});
+    const task=vm.runInContext("exportTinkercadDesign({signal})",env.context);
+    if(cancel) controller.abort();
+    await assert.rejects(task,cancel ? /cancelled/ : /empty|no triangles/i);
+    assert.equal(env.downloads,0);
+  }
+});
+
+test("capture keeps spatial notes from compact metadata and the design-data tool", async () => {
+  const notes=[{uuid:"n",content:"Fit 🟢\nKeep this",position:{x:12,y:-3,z:8},privateExtra:"omit"}];
+  for(const compact of [false,true]) {
+    const env=environment();
+    if(compact) {
+      const scene=compactScene({versions_id:"part",dataType:"preset"});
+      env.context.testKit={sceneModel:{children:new Map([["part",scene]])},editorData:{notes:{values:()=>notes}}};
+      env.context.llm={tools:{get_design_data:{run(){throw Error("Heavy metadata call");}}}};
+    } else {
+      installScene(env,{geometry:{get:()=>triangleGeometry()},computeWorldMatrix:()=>({determinant:()=>1})});
+      const original=env.context.llm.tools.get_design_data.run;
+      env.context.llm.tools.get_design_data.run=()=>({...original(),notes});
+    }
+    const captured=await vm.runInContext(`exportTinkercadDesign({download:false,lazy:${compact}})`,env.context);
+    assert.deepEqual(JSON.parse(JSON.stringify(captured.notes)),[{uuid:"n",content:notes[0].content,position:notes[0].position}]);
+    if(!compact) {
+      await vm.runInContext("exportTinkercadDesign()",env.context);
+      assert.deepEqual(JSON.parse(await env.blob.text()).notes,captured.notes && JSON.parse(JSON.stringify(captured.notes)));
+    }
+  }
+});
+
 test("Promise-returning evaluators need no callback or parameter substitution", async () => {
   const env = environment({timers: true});
   let ready;
@@ -302,6 +360,7 @@ test("the actual download exports large meshes without a whole-capture or whole-
     format: "tinkercad-evaluated-world-v1",
     shapes,
     meshes,
+    notes: [],
     diagnostics: shapes.map((s) => ({ id: s.versions_id, triangles: 10000 })),
   };
   // Reproduce the old failure at the same JSON.stringify call boundary.

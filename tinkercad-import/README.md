@@ -49,6 +49,10 @@ Each triangle uses nine position values. The exporter handles indexed geometry b
 
 ## Verification and limits
 
+Spatial notes retain their text and world positions. They open as collapsed pins without a body anchor. In smaller-assembly exports, each note appears once, in the project containing the nearest original top-level construction-root centre. Its position does not move. Older JSON captures that omitted notes cannot recover them; capture the source design again.
+
+The converter stops if a note has invalid text or coordinates, if the design has more than 200 notes, or if a note exceeds Layerling's 2,000-character text limit. Some Unicode characters count as two toward that limit. No note is silently truncated or discarded.
+
 `convert.py --self-test` runs the Python converter regression suite. `node --test test_exporter.cjs` checks bounded serialization and incomplete-capture refusal. `node --test test_browser_converter.cjs` checks browser archive generation and strict geometry rejection. These use synthetic fixtures.
 
 `verify_geometry.py capture.json design.lyl` checks ZIP integrity, asset hashes, mesh counts, and every stored world vertex against the capture. Optional `--rendered file.json` compares a separately collected renderer capture in both directions, allowing vertex reordering. This repository does not include a portable renderer-capture tool.

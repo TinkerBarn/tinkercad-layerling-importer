@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.5 — Preview — 24 October 2026
+
+- Evaluate empty geometry placeholders instead of immediately rejecting them as invalid triangles. Persistent empty results still stop export with a clear error; no part or operand is discarded.
+- Preserve spatial note text and world positions through direct export, saved JSON and the Python converter. Notes open as collapsed pins, without a body anchor.
+- Assign each note once to the split project with the nearest original construction-root centre. Original note positions remain unchanged.
+- Stop explicitly for invalid notes or notes exceeding Layerling's 200-note or 2,000-character limits instead of silently losing text. Some Unicode characters count as two toward the text limit.
+
+Synthetic capture regressions cover the empty-placeholder failure. The reporter's actual Volvo design still needs a retry; this is not a confirmed fix for that design.
+
 ## 0.2.4 — Preview — 23 October 2026
 
 - Fix Firefox bookmark installation by minifying the self-contained bookmark below its 65,536-character saved-URL limit. Version 0.2.3 exceeded this limit.
