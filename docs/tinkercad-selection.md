@@ -46,11 +46,22 @@ Omitting `scope` keeps whole-design capture as the default. The optional
 
 ## Review and preview limits
 
-The API was inspected in the public frontend source. A read-only Safari inspection
-was blocked because “Allow JavaScript from Apple Events” was disabled. No browser
-security settings were changed and no source design was mutated. No tests were
-added or run for this candidate, and no live selected export or Layerling round
-trip has been verified.
+Manual validation reported by TinkerBarn on 25 October 2026:
+
+- Exporting one selected part in Safari succeeded; the exported file imported
+  successfully into Layerling.
+- Exporting multiple selected parts in Safari succeeded; that exported file also
+  imported successfully into Layerling.
+
+The exact tested bookmark build and Safari version were not recorded. These
+reports establish the two manual cases above, rather than a separate verification
+of every PR artifact or all group/Boolean and browser configurations. No automated
+tests were added or run for this candidate.
+
+The internal API was inspected in the public frontend source. An earlier automated
+read-only Safari inspection was blocked because “Allow JavaScript from Apple
+Events” was disabled; that limitation does not prevent manual bookmark use.
+No browser security settings were changed during that inspection.
 
 Before release, use this branch's generated `tinkercad-import/bookmarklet.html`
 locally to install the self-contained preview bookmark. The public setup page,
