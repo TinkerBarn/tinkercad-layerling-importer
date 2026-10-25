@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Selected-parts export
+
+- Ask explicitly whether to export the whole design or the currently selected parts/groups, including multi-selection.
+- Preserve complete selected subtrees, Boolean operands and world positions; avoid duplicating overlapping selections.
+- Refuse empty, unsupported or stale selections instead of silently exporting the whole design.
+- Mark selected-only filenames with `- selection` and omit unassociated design-level notes in that mode.
+
 ## 0.2.5 — Preview — 24 October 2026
 
 - Evaluate empty geometry placeholders instead of immediately rejecting them as invalid triangles. Persistent empty results still stop export with a clear error; no part or operand is discarded.

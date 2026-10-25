@@ -15,11 +15,13 @@ These bar instructions follow the browser help for [Chrome](https://support.goog
 ## Export a design
 
 1. Open your design in Tinkercad's editor and wait for it to load. If you see its preview page, click **Edit** first.
-2. Click the saved **Export to layerling** bookmark on your browser's bar. If Tinkercad reloads, wait for the design to reappear and click the bookmark again.
+2. For a selected-parts export, select the parts or groups first; use **Shift-click** for multiple selections. Click the saved **Export to layerling** bookmark, then choose **Export whole design** or **Export selected parts**. If Tinkercad reloads, wait for the design to reappear, reselect your parts and click the bookmark again.
 3. Wait for **Project ready**. The `.lyl` file usually goes into your **Downloads** folder. If nothing downloads, click **Download .lyl again** in the export panel.
 4. On [Layerling's start page](https://layerling.com/), click **Open a design or import geometry** and select that file. You can also drag it into the Layerling window.
 
 Your original Tinkercad design stays unchanged. Repeat only **Export a design** for your next design.
+
+Selection is captured when the bookmark opens. Close and reopen the panel after changing it. Selected groups retain their complete contents and Boolean operands at their original world positions; overlapping selections are exported once. An empty, unsupported or stale selection never falls back to the whole design. Selected-only filenames include `- selection`. See the [selection API and limitations](docs/tinkercad-selection.md).
 
 For offline installation, extract the browser ZIP and open `index.html`. To convert an earlier JSON capture, use **Convert an earlier JSON export** on the installer page.
 
@@ -29,7 +31,7 @@ To update, replace the saved bookmark from the new installer. Existing bookmarks
 
 Evaluated triangle geometry, colors, grouping, visibility, and boolean operands are retained. Parts are editable meshes; original parametric sketches are not recovered. Missing evaluated geometry stops conversion instead of producing a partial project. Large designs require available browser memory.
 
-Spatial notes retain text and positions within the [documented note limits](tinkercad-import/README.md#verification-and-limits). Older JSON captures that omitted notes need to be captured again.
+Whole-design exports retain spatial note text and positions within the [documented note limits](tinkercad-import/README.md#verification-and-limits). Selected-only exports omit design-level notes because they have no supported part association. Older JSON captures that omitted notes need to be captured again.
 
 Capture reads the open design without modifying it. Conversion stays in your browser; the importer does not upload designs. GitHub hosts the installer and has its own hosting logs. This unofficial preview uses Tinkercad's undocumented editor tools, which can change. It is not affiliated with Autodesk or Layerling.
 

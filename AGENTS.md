@@ -15,6 +15,8 @@ Run the commands in CONTRIBUTING.md when verification is requested. Change sourc
 
 ## Status
 
+Independent selection-export PR candidate is on `codex/selected-parts-export`, based directly on upstream/main `00d44cf`. It contains only selection scope, corresponding documentation and rebuilt browser artifacts; it does not include the partial-export PR. Existing online loading/update controls and geometry-failure behavior are preserved. Build succeeds with a 65,488-character bookmark URL; static diff review passes. The user's combined `codex/export-selected-parts` branch and installed HTML remain unchanged (matching installer SHA-256 `53d9b59c87645330f36a906dbebd07a7ea015296663d54d47f4347b11acc1c2b`). No tests were added or run; do not add/run tests unless explicitly requested, and use `[skip ci]` for this candidate. User authorized a separate branch and PR; prepare it as a draft because live exports remain unverified.
+
 Current published preview is v0.2.5, with empty-placeholder evaluation and spatial notes. The self-contained bookmark is 62,035 characters, below Firefox's enforced 65,536 limit. All 96 local regression checks and four Windows/Linux CI jobs pass. Public ZIPs and all five hosted files match audited assets. Actual Layerling reader/writer note save/reopen passes under Node; visual browser checks and the reporter's Volvo retry remain outstanding. Earlier entries below are historical evidence.
 
 Version 0.2.3 is in development for large-design failures. Fixed mixed geometry-evaluation completion contracts, added Cancel and a bounded scrollable panel, stopped at first capture failure, and removed intermediate mesh arrays. User reports successful capture of the supplied Kyogre reproduction. Added lossless native browser ZIP compression with STORE fallback; verified all 145 entries of its 115,366,065-byte download remain identical in a 20,575,980-byte archive written by the new ZIP writer under Node. 37 Node and 14 Python tests pass. Eighteen synthetic assemblies plus the private reference retain exact mesh bytes and zero stored vertex error. Nothing published.
@@ -24,6 +26,8 @@ Version 0.2.2 instructions published: one-time setup, bookmarks-bar shortcuts, d
 Version 0.2.1 preview published with HTTPS Pages hosting. Windows/Linux CI, exact release asset checks and hosted delivery checks pass. See docs/browser-release-checks.md for the limited Chrome verification.
 
 ## Findings
+
+Tinkercad's public `assets_v2_6v4pse/js/3dviewerBundle.js`, EditorTestKitModel module 51670, exposes read-only `getSelectionCount()` and `getSelectedAt(index)`. Feature-detect and snapshot selected `data.versions_id` values before panel insertion. Require exact live scene-node matches, preserve full selected subtrees, and never fall back to all shapes. Direct Safari inspection was blocked by its Apple Events JavaScript setting; no live export verification is claimed. See `docs/tinkercad-selection.md`.
 
 The Kyogre archive contains 144 mesh assets, 829 scene nodes, 30 groups and 1,590,228 stored triangles. Compression reduces download size without simplifying geometry or removing editable operands; it does not establish faster Layerling editing. The native compression path still needs a real Chrome bookmark run and Layerling open/save verification. Native compression uses DEFLATE ZIP method 8; unsupported constructors/formats fall back to STORE. Compression errors must reject, and cancellation must interrupt pending stream reads.
 
@@ -36,6 +40,8 @@ Tinkercad capture depends on undocumented editor tools. Imported geometry is edi
 The REST release-by-tag endpoint does not resolve unpublished drafts. Resolve drafts through the CLI, then request asset metadata by release ID.
 
 ## TODO
+
+Live single/multiple/group-selected exports and Layerling reopening remain unverified. Do not run/add tests without explicit authorization. Keep the combined installation and partial-export PR branch unchanged; publish only the independent selection PR branch for this task.
 
 Verify the new compressed download through the Chrome bookmark and Layerling open/Ungroup/save/reopen. The user-reported timeout reproduction now exports successfully; independent source-capture comparison for that design remains unavailable. Cancellation coverage includes a never-resolving initial design-data request, pending geometry, late results, conversion, active compression and packaging including its final progress event. Memory checks remain structural; no measured speedup or peak-memory reduction is claimed.
 

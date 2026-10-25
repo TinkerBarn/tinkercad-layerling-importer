@@ -2,6 +2,14 @@
 
 Start with the [setup and usage instructions](../README.md).
 
+## Selected-parts export
+
+Select one or more parts/groups before opening the bookmark, then choose **Export selected parts**. Use Shift-click for multiple selections. The selection is snapshotted before the panel receives focus. Close and reopen it to change that snapshot; reselect after a first-run editor reload.
+
+Complete selected subtrees and Boolean operands retain their world positions. Selecting both a group and a descendant exports the subtree once. Selecting an operand alone does not add its ancestor Boolean operation. Unsupported, empty or stale selections stop selected-only export; they never cause a whole-design export. Selected-only filenames contain `- selection`, and design-level spatial notes are omitted because no supported association to selected parts exists. Whole-design export and its note handling remain available separately.
+
+See the [inspected internal selection API and compatibility limits](../docs/tinkercad-selection.md). The console API accepts `exportTinkercadDesign({scope: "selection"})`; its default remains whole-design capture.
+
 ## Optional Python CLI
 
 Python 3.10+ is required only for this path. Use a capture exported through the bookmarklet's advanced troubleshooting option:
@@ -49,7 +57,7 @@ Each triangle uses nine position values. The exporter handles indexed geometry b
 
 ## Verification and limits
 
-Spatial notes retain their text and world positions. They open as collapsed pins without a body anchor. In smaller-assembly exports, each note appears once, in the project containing the nearest original top-level construction-root centre. Its position does not move. Older JSON captures that omitted notes cannot recover them; capture the source design again.
+Whole-design spatial notes retain their text and world positions. Selected-only exports omit design-level notes. Notes open as collapsed pins without a body anchor. In smaller-assembly exports, each note appears once, in the project containing the nearest original top-level construction-root centre. Its position does not move. Older JSON captures that omitted notes cannot recover them; capture the source design again.
 
 The converter stops if a note has invalid text or coordinates, if the design has more than 200 notes, or if a note exceeds Layerling's 2,000-character text limit. Some Unicode characters count as two toward that limit. No note is silently truncated or discarded.
 

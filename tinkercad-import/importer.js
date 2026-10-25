@@ -1011,7 +1011,25 @@ async function tinkercadJsonBlob(value, checkCancelled = () => {}) {
   return new Blob(blobs, {type:"application/json"});
 }
 
-async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}} = {}) {
+// Tinkercad EditorTestKitModel exposes these read-only getters. See
+// docs/tinkercad-selection.md for the inspected source and compatibility limits.
+function tinkercadSelectedIds() {
+  if (typeof testKit === "undefined") return null;
+  if (typeof testKit.getSelectionCount !== "function" || typeof testKit.getSelectedAt !== "function")
+    throw Error("Selection unavailable. Reload Tinkercad.");
+  const count = testKit.getSelectionCount(), ids = new Set();
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw Error("Invalid selection.");
+  for (let i = 0; i < count; i++) {
+    const node = testKit.getSelectedAt(i), id = node?.data?.versions_id;
+    if (node === testKit.sceneModel || !id || node.data.hasBeenRemoved || ids.has(String(id)))
+      throw Error("Reselect 3D parts/groups.");
+    ids.add(String(id));
+  }
+  return [...ids];
+}
+
+async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}, scope = "all", selectionIds} = {}) {
   const cancelled = () => {
     if (signal?.aborted) {
       const error = new Error("Import cancelled.");
@@ -1020,6 +1038,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
   };
   cancelled();
+  if (scope !== "all" && scope !== "selection") throw Error("Invalid export scope.");
   if (lazy && download) throw new Error("Lazy capture is for direct conversion only.");
   const tools = window.llm?.tools?.get_design_data;
   if (typeof testKit === "undefined" || !tools) {
@@ -1031,7 +1050,33 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
   let shapes, notes = [];
-  const roots = [...testKit.sceneModel.children.values()];
+  let roots = [...testKit.sceneModel.children.values()];
+  const ids = scope === "selection" ? (selectionIds ?? tinkercadSelectedIds()) : null;
+  if (scope === "selection" && (!Array.isArray(ids) || !ids.length))
+    throw Error("Select parts/groups first.");
+  const wanted = ids && new Set(ids), selectedRoots = [], found = new Set();
+  const sceneNodes = new Map(), seen = new Set();
+  function visit(node, selectedParent = false) {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    const id = String(node.data?.versions_id || node.versions_id || "");
+    if (id) {
+      if (wanted?.has(id)) {
+        if (found.has(id) || node.data?.hasBeenRemoved) throw Error("Selection changed. Reopen.");
+        found.add(id);
+        if (!selectedParent) selectedRoots.push(node);
+        selectedParent = true;
+      }
+      sceneNodes.set(id, node);
+    }
+    const children = node.children;
+    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child, selectedParent);
+  }
+  if (wanted) {
+    visit(testKit.sceneModel);
+    if (found.size !== wanted.size) throw Error("Selection changed. Reopen.");
+    roots = selectedRoots;
+  }
   const compactMetadata = lazy && roots.every(node =>
     node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
       typeof node.data.dataType?.get === "function" &&
@@ -1114,22 +1159,31 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     const payload = result?.content?.[0]?.json || result?.json || result;
     shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
     notes = payload?.notes || [];
+    if (wanted && Array.isArray(shapes)) {
+      const rootIds = roots.map(node => String(node.data?.versions_id || node.versions_id)), picked = new Map();
+      const pick = nodes => {
+        for (const node of nodes) {
+          const id = String(node.versions_id || "");
+          if (rootIds.includes(id)) {
+            if (picked.has(id)) throw Error("Ambiguous selected parts.");
+            picked.set(id, node);
+          } else pick(node.children || []);
+        }
+      };
+      pick(shapes);
+      if (picked.size !== rootIds.length) throw Error("Selected parts missing.");
+      shapes = rootIds.map(id => picked.get(id));
+    }
   }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  // Spatial notes have no supported part association; selected-parts export
+  // includes geometry subtrees only. Whole-design export retains every note.
+  if (wanted) notes = [];
   if (!Array.isArray(notes)) throw new Error("Tinkercad did not return a notes list.");
   notes = notes.map(note => ({uuid:note?.uuid, content:note?.content,
     position:note?.position && {x:note.position.x,y:note.position.y,z:note.position.z}}));
   cancelled();
-  const sceneNodes = new Map(), seen = new Set();
-  function visit(node) {
-    if (!node || seen.has(node)) return;
-    seen.add(node);
-    const id = node.data?.versions_id || node.versions_id;
-    if (id) sceneNodes.set(String(id), node);
-    const children = node.children;
-    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child);
-  }
-  visit(testKit.sceneModel);
+  if (!wanted) visit(testKit.sceneModel);
   const meshes = Object.create(null), meshParts = [], diagnostics = [];
   let captured = 0, triangles = 0;
   let total = 0;
@@ -1540,6 +1594,10 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       return;
     }
     previous?.dispose();
+    // Snapshot before focus or panel clicks can change Tinkercad's selection.
+    let selectionIds = null, selectionError = "";
+    try { selectionIds = tinkercadSelectedIds(); }
+    catch (error) { selectionError = String(error?.message || error); }
     const view = createPanel();
     const controller = new AbortController();
     let releaseDownload = () => {}, elapsedTimer;
@@ -1648,7 +1706,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
     trace.record({phase:"starting"}, "setup");
     let totalParts = 0, processedParts = 0;
-    const started = Date.now();
+    let started = Date.now();
     const updateElapsed = () => {
       const seconds = Math.floor((Date.now()-started)/1000);
       view.elapsed.textContent = `Elapsed: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
@@ -1675,8 +1733,44 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       if (session.disposed) throw Error("Import closed.");
       view.status.textContent = message;
     };
+    const chooseScope = () => new Promise((resolve, reject) => {
+      const choices = document.createElement("div"), hint = document.createElement("p");
+      hint.textContent = selectionError || (selectionIds === null
+        ? "Reselect after reload."
+        : selectionIds.length ? `${selectionIds.length} selected parts/groups.`
+          : "Select parts, then reopen; or export all.");
+      choices.append(hint);
+      const finish = scope => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        if (!scope) {
+          const error = Error("Import cancelled."); error.name = "AbortError";
+          reject(error);
+          return;
+        }
+        view.close.disabled = true;
+        view.meter.hidden = view.counts.hidden = view.elapsed.hidden = false;
+        resolve(scope);
+      };
+      const abort = () => finish();
+      for (const [label, scope] of [["Export whole design", "all"], ["Export selected parts", "selection"]]) {
+        const button = document.createElement("button");
+        button.type = "button"; button.textContent = label;
+        button.disabled = scope === "selection" && (selectionError || selectionIds?.length === 0);
+        button.addEventListener("click", () => finish(scope));
+        choices.append(button);
+      }
+      view.meter.hidden = view.counts.hidden = view.elapsed.hidden = true;
+      view.close.disabled = false;
+      progress("Choose what to export.");
+      view.panel.append(choices);
+      controller.signal.addEventListener("abort", abort, {once:true});
+      if (controller.signal.aborted) abort();
+    });
     session.promise = (async () => {
       try {
+        const scope = await chooseScope();
+        started = Date.now();
         progress("Capturing the open design…");
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (session.disposed) return;
@@ -1687,6 +1781,8 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
           onProgress: progress,
           signal: controller.signal,
           onDiagnostic: diagnostic,
+          scope,
+          selectionIds,
         });
         if (session.disposed) return;
         if (!capture) {
@@ -1696,7 +1792,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
           );
           return;
         }
-        const name = projectName(document.title);
+        const name = projectName(document.title) + (scope === "selection" ? " - selection" : "");
         let output = {extension:".lyl"};
         const blob = await convertTinkercadToLayerling(capture, name, {
           onProgress: progress,

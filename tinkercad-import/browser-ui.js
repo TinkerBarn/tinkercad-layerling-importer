@@ -160,6 +160,10 @@
       return;
     }
     previous?.dispose();
+    // Snapshot before focus or panel clicks can change Tinkercad's selection.
+    let selectionIds = null, selectionError = "";
+    try { selectionIds = tinkercadSelectedIds(); }
+    catch (error) { selectionError = String(error?.message || error); }
     const view = createPanel();
     const controller = new AbortController();
     let releaseDownload = () => {}, elapsedTimer;
@@ -268,7 +272,7 @@
     }
     trace.record({phase:"starting"}, "setup");
     let totalParts = 0, processedParts = 0;
-    const started = Date.now();
+    let started = Date.now();
     const updateElapsed = () => {
       const seconds = Math.floor((Date.now()-started)/1000);
       view.elapsed.textContent = `Elapsed: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
@@ -295,8 +299,44 @@
       if (session.disposed) throw Error("Import closed.");
       view.status.textContent = message;
     };
+    const chooseScope = () => new Promise((resolve, reject) => {
+      const choices = document.createElement("div"), hint = document.createElement("p");
+      hint.textContent = selectionError || (selectionIds === null
+        ? "Reselect after reload."
+        : selectionIds.length ? `${selectionIds.length} selected parts/groups.`
+          : "Select parts, then reopen; or export all.");
+      choices.append(hint);
+      const finish = scope => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        if (!scope) {
+          const error = Error("Import cancelled."); error.name = "AbortError";
+          reject(error);
+          return;
+        }
+        view.close.disabled = true;
+        view.meter.hidden = view.counts.hidden = view.elapsed.hidden = false;
+        resolve(scope);
+      };
+      const abort = () => finish();
+      for (const [label, scope] of [["Export whole design", "all"], ["Export selected parts", "selection"]]) {
+        const button = document.createElement("button");
+        button.type = "button"; button.textContent = label;
+        button.disabled = scope === "selection" && (selectionError || selectionIds?.length === 0);
+        button.addEventListener("click", () => finish(scope));
+        choices.append(button);
+      }
+      view.meter.hidden = view.counts.hidden = view.elapsed.hidden = true;
+      view.close.disabled = false;
+      progress("Choose what to export.");
+      view.panel.append(choices);
+      controller.signal.addEventListener("abort", abort, {once:true});
+      if (controller.signal.aborted) abort();
+    });
     session.promise = (async () => {
       try {
+        const scope = await chooseScope();
+        started = Date.now();
         progress("Capturing the open design…");
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (session.disposed) return;
@@ -307,6 +347,8 @@
           onProgress: progress,
           signal: controller.signal,
           onDiagnostic: diagnostic,
+          scope,
+          selectionIds,
         });
         if (session.disposed) return;
         if (!capture) {
@@ -316,7 +358,7 @@
           );
           return;
         }
-        const name = projectName(document.title);
+        const name = projectName(document.title) + (scope === "selection" ? " - selection" : "");
         let output = {extension:".lyl"};
         const blob = await convertTinkercadToLayerling(capture, name, {
           onProgress: progress,
