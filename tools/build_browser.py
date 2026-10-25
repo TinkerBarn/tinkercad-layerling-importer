@@ -37,8 +37,9 @@ def main():
         raise SystemExit("VERSION must contain a numeric major.minor.patch version")
     template = TEMPLATE.read_text(encoding="utf-8").replace("{{VERSION}}", version)
     converter = (ROOT / "tinkercad-import/browser-assemblies.js").read_text(encoding="utf-8").strip() + "\n" + CONVERTER.read_text(encoding="utf-8").strip()
-    loader = (ROOT / "tinkercad-import/browser-loader.js").read_text(encoding="utf-8").strip()
-    importer = loader + "\n" + IMPORTER.read_text(encoding="utf-8").replace("{{VERSION}}",version).strip()
+    # This fork preview is self-contained. Loading the upstream online runtime
+    # would replace its selection support and also consumes bookmark URL space.
+    importer = IMPORTER.read_text(encoding="utf-8").replace("{{VERSION}}",version).strip()
     if template.count(MARKER) != 1:
         raise SystemExit("Expected one converter marker in the install template")
     if template.count("/* IMPORTER_SOURCE */") != 1:
@@ -46,11 +47,9 @@ def main():
     # Escape closing script tags before embedding source in HTML.
     escape = lambda source: re.sub(r"</script", lambda match: "<\\/" + match.group()[2:], source, flags=re.IGNORECASE)
     output = template.replace(MARKER, escape(converter)).replace("/* IMPORTER_SOURCE */", escape(importer))
-    # The online runtime defines entry points; only the bookmark invokes them.
+    # The standalone runtime defines entry points; only the bookmark invokes them.
     exporter = template.split('<script id="exporter">',1)[1].split("</script>",1)[0].strip()
-    runtime = converter + "\n" + exporter + "\n" + importer + "\nglobalThis.__layerlingRuntimeLoaded = true;\n"
-    online = bookmark_url(loader + "\nvoid layerlingLoadLatest();")
-    output = output.replace("{{ONLINE_BOOKMARK}}", online)
+    runtime = converter + "\n" + exporter + "\n" + importer + "\n"
     source = minify(converter + "\n" + exporter + "\n" + importer) + "\nvoid runLayerlingImport();"
     url = bookmark_url(source)
     if output.count("{{BOOKMARK_SOURCE}}") != 1:

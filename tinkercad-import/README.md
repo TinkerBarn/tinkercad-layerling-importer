@@ -14,6 +14,14 @@ Use `py` on Windows or `python3` on macOS/Linux if needed. Replace the example p
 
 ## Geometry and editing
 
+This fork preview asks whether to export the whole design or only the currently
+selected parts. Select parts/groups in Tinkercad before invoking the bookmark;
+Shift-click adds more. Selected groups retain their complete descendants and
+Boolean operands, and world coordinates are preserved. Empty, unsupported or
+stale selections are rejected without a whole-design fallback. The selection
+snapshot is refreshed by closing and reopening the bookmark panel. See the
+[source-inspected API contract and limitations](../docs/tinkercad-selection.md).
+
 Every leaf and evaluated boolean group needs a mesh keyed by its unique `versions_id`. Positions use Tinkercad world coordinates; normals are included when available. The exporter applies each node's actual world transform, including nested placement, scaling, and reflections. The converter changes axes from `(x,y,z)` to `(x,z,-y)` for Layerling.
 
 Boolean groups carry both their evaluated result and their editable operands. The group displays the result mesh. Ungroup restores the solid and hole cutters with their source visibility. A visible hole cutter is translucent; an explicitly hidden source object stays hidden.
@@ -50,7 +58,7 @@ Each triangle uses nine position values. The exporter handles indexed geometry b
 
 ## Verification and limits
 
-Spatial notes retain their text and world positions. They open as collapsed pins without a body anchor. In smaller-assembly exports, each note appears once, in the project containing the nearest original top-level construction-root centre. Its position does not move. Older JSON captures that omitted notes cannot recover them; capture the source design again.
+Whole-design exports retain spatial note text and world positions. Selected-only exports omit design-level notes, because there is no supported selected-part association. Notes open as collapsed pins without a body anchor. In smaller-assembly exports, each note appears once, in the project containing the nearest original top-level construction-root centre. Its position does not move. Older JSON captures that omitted notes cannot recover them; capture the source design again.
 
 The converter stops if a note has invalid text or coordinates, if the design has more than 200 notes, or if a note exceeds Layerling's 2,000-character text limit. Some Unicode characters count as two toward that limit. No note is silently truncated or discarded.
 
@@ -69,7 +77,11 @@ The export panel shows its version, a part-count percentage, the current stage a
 
 Layerling's current source includes **Insert design** in its Import panel. This adds a saved project's bodies to the open project with fresh identities and preserves their positions. Open one assembly, then use Import → Insert design for another; opening another project instead replaces the open project. This path has been inspected in source but not independently verified in the live UI. Adding every assembly recreates the original geometry load.
 
-The panel requests a small public version file without design data, credentials or a referrer. When a newer version is available, **Run latest version** loads it for that run after the current export finishes. It does not change a saved self-contained bookmark. The optional experimental **online** bookmark loads the hosted exporter on every run, avoiding future bookmark replacement after a one-time installation. Both requests can be blocked by editor policies or fail offline; the self-contained bookmark remains available. Online runtime files must be published before this local preview can work against the public site.
+This selection preview is self-contained and uses manual bookmark replacement.
+The upstream online loader and automatic version controls are excluded so that
+they cannot replace this fork's feature with the original hosted runtime and so
+the bookmark stays below the build's saved-URL size limit. Download this branch's
+setup HTML and replace an older bookmark; no hosted feature release is implied.
 
 
 ### Layerling reader limits and preservation files

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — TinkerBarn selection preview
+
+- Ask explicitly whether to export the whole design or only the current Tinkercad selection.
+- Snapshot multiple selected scene-model identities, retain complete selected group subtrees and Boolean operands, and avoid duplicate ancestor/child exports.
+- Reject unsupported, empty or stale selections without a whole-design fallback. Selected-only files retain world positions, have `- selection` in their names and omit unassociated design-level notes.
+- Document the source-inspected internal selection getters. No feature tests have been added or run.
+- Use a self-contained fork installer with manual bookmark replacement; exclude the original project's online runtime loader and automatic update controls.
+
 ## Unreleased — Explicit partial export
 
 - Keep export all-or-nothing by default when Tinkercad cannot evaluate geometry.

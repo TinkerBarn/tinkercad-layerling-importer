@@ -23,6 +23,7 @@ FILES = (
     "README.md",
     "docs/publishing.md",
     "docs/browser-release-checks.md",
+    "docs/tinkercad-selection.md",
     "docs/plans/tinkercad-import-integration.md",
     "tinkercad-import/README.md",
     "tinkercad-import/bookmarklet.html",

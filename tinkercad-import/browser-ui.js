@@ -2,22 +2,8 @@
 (function (root) {
   "use strict";
   const VERSION = "{{VERSION}}";
-  const SITE = "https://taylormadearmy.github.io/tinkercad-layerling-importer/";
   root.layerlingImporterVersion = VERSION;
   const sizeLabel = bytes => bytes >= 1024**3 ? `${(bytes/1024**3).toFixed(2)} GiB` : `${(bytes/1024**2).toFixed(1)} MiB`;
-  async function checkUpdate(signal) {
-    if (typeof root.fetch !== "function") throw Error("Update check unavailable");
-    const response = await root.fetch(SITE+"version.json", {signal,credentials:"omit",referrerPolicy:"no-referrer",cache:"no-store"});
-    if (!response.ok) throw Error("Update check unavailable");
-    const text = await response.text();
-    if (text.length > 4096) throw Error("Invalid update response");
-    const version = JSON.parse(text).version;
-    if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw Error("Invalid update version");
-    const a = version.split(".").map(Number), b = VERSION.split(".").map(Number);
-    if (!a.every(Number.isSafeInteger)) throw Error("Invalid update version");
-    const diff = a.map((v,i)=>v-b[i]).find(v=>v!==0) || 0;
-    return {version,newer:diff>0};
-  }
   function projectName(title) {
     return (
       String(title || "")
@@ -108,13 +94,11 @@
     const title = document.createElement("strong");
     title.textContent = "Tinkercad to layerling";
     const version = document.createElement("p");
-    version.textContent = `Version ${VERSION}`;
-    const updateStatus = document.createElement("span");
-    const update = document.createElement("button");
-    update.type = "button"; update.textContent = "Check for updates";
+    version.textContent = `Version ${VERSION} · TinkerBarn selection preview`;
     const setup = document.createElement("a");
-    setup.href = SITE; setup.target = "_blank"; setup.rel = "noopener noreferrer";
-    setup.textContent = "Open setup page";
+    setup.href = "https://github.com/TinkerBarn/tinkercad-layerling-importer/tree/codex/export-selected-parts";
+    setup.target = "_blank"; setup.rel = "noopener noreferrer";
+    setup.textContent = "Fork setup instructions";
     const status = document.createElement("p");
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
@@ -148,10 +132,10 @@
     continueOnFailure.type = "button";
     continueOnFailure.textContent = "Continue without failed parts";
     failureChoices.append(stopOnFailure, continueOnFailure);
-    panel.append(title, cancel, close, version, updateStatus, update, setup, status, meter, counts, elapsed, link);
+    panel.append(title, cancel, close, version, setup, status, meter, counts, elapsed, link);
     panel.append(failureChoices);
     document.body.append(panel);
-    return { panel, status, link, close, cancel, meter, counts, elapsed, update, updateStatus, failureChoices, stopOnFailure, continueOnFailure };
+    return { panel, status, link, close, cancel, meter, counts, elapsed, failureChoices, stopOnFailure, continueOnFailure };
   }
 
   async function runLayerlingImport() {
@@ -170,11 +154,13 @@
       return;
     }
     previous?.dispose();
+    // Snapshot before focus or panel clicks can change Tinkercad's selection.
+    let selectionIds = null, selectionError = "";
+    try { selectionIds = tinkercadSelectedIds(); }
+    catch (error) { selectionError = String(error?.message || error); }
     const view = createPanel();
     const controller = new AbortController();
     let releaseDownload = () => {}, elapsedTimer;
-    const updateController = new AbortController();
-    let updateTimer;
     const session = {
       busy: true,
       disposed: false,
@@ -184,8 +170,6 @@
         session.disposed = true;
         controller.abort();
         clearTimeout(elapsedTimer);
-        clearTimeout(updateTimer);
-        updateController.abort();
         releaseDownload();
         view.panel.remove();
         root.removeEventListener?.("pagehide", session.dispose);
@@ -201,37 +185,6 @@
       view.cancel.disabled = true;
       view.status.textContent = "Cancelling import…";
     });
-    let latest, checking = false;
-    const update = async () => {
-      if (checking) return;
-      if (latest?.newer) {
-        if (session.busy) return;
-        root.layerlingLoadLatest();
-        return;
-      }
-      checking = true;
-      view.update.disabled = true;
-      view.updateStatus.textContent = "Checking for updates… ";
-      const request = new AbortController();
-      const abort = () => request.abort();
-      updateController.signal.addEventListener("abort",abort,{once:true});
-      updateTimer = setTimeout(abort,5000);
-      try {
-        latest = await checkUpdate(request.signal);
-        if (session.disposed) return;
-        view.updateStatus.textContent = latest.newer ? `Version ${latest.version} available. ` : "No newer published version. ";
-        if (latest.newer) view.update.textContent = "Run latest version";
-      } catch (_) {
-        if (!session.disposed) view.updateStatus.textContent = "Update check unavailable. Use the setup page. ";
-      } finally {
-        checking = false;
-        clearTimeout(updateTimer);
-        updateController.signal.removeEventListener("abort",abort);
-        if (!session.disposed) view.update.disabled = Boolean(latest?.newer && session.busy);
-      }
-    };
-    view.update.addEventListener("click",()=>{void update();});
-    if (typeof root.fetch === "function") void update();
     const chooseOutput = plan => new Promise((resolve,reject) => {
       const choices = document.createElement("div");
       const warning = document.createElement("p");
@@ -278,7 +231,7 @@
     }
     trace.record({phase:"starting"}, "setup");
     let totalParts = 0, processedParts = 0;
-    const started = Date.now();
+    let started = Date.now();
     const updateElapsed = () => {
       const seconds = Math.floor((Date.now()-started)/1000);
       view.elapsed.textContent = `Elapsed: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
@@ -305,6 +258,39 @@
       if (session.disposed) throw Error("Import closed.");
       view.status.textContent = message;
     };
+    const chooseScope = () => new Promise((resolve, reject) => {
+      const choices = document.createElement("div"), hint = document.createElement("p");
+      hint.textContent = selectionError || (selectionIds === null
+        ? "After a first-run reload, reselect your parts and reopen the bookmark."
+        : selectionIds.length ? `${selectionIds.length} selected parts/groups. Selected groups include all their contents.`
+          : "No parts selected. Close, select parts/groups (Shift-click for more), then reopen this bookmark. Whole-design export is available.");
+      choices.append(hint);
+      const finish = scope => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        view.close.disabled = true;
+        view.meter.hidden = view.counts.hidden = view.elapsed.hidden = false;
+        resolve(scope);
+      };
+      const abort = () => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        const error = Error("Import cancelled."); error.name = "AbortError"; reject(error);
+      };
+      for (const [label, scope] of [["Export whole design", "all"], ["Export selected parts", "selection"]]) {
+        const button = document.createElement("button");
+        button.type = "button"; button.textContent = label;
+        button.disabled = scope === "selection" && (Boolean(selectionError) || selectionIds?.length === 0);
+        button.addEventListener("click", () => finish(scope), {once:true});
+        choices.append(button);
+      }
+      view.meter.hidden = view.counts.hidden = view.elapsed.hidden = true;
+      view.close.disabled = false;
+      progress("Choose what to export.");
+      view.panel.append(choices);
+      controller.signal.addEventListener("abort", abort, {once:true});
+      if (controller.signal.aborted) abort();
+    });
     const choosePartialExport = failure => new Promise(resolve => {
       const finish = shouldContinue => {
         view.failureChoices.hidden = true;
@@ -334,6 +320,8 @@
     });
     session.promise = (async () => {
       try {
+        const scope = await chooseScope();
+        started = Date.now();
         progress("Capturing the open design…");
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (session.disposed) return;
@@ -345,6 +333,8 @@
           signal: controller.signal,
           onDiagnostic: diagnostic,
           onGeometryFailure: choosePartialExport,
+          scope,
+          selectionIds,
         });
         if (session.disposed) return;
         if (!capture) {
@@ -354,7 +344,7 @@
           );
           return;
         }
-        const name = projectName(document.title);
+        const name = projectName(document.title) + (scope === "selection" ? " - selection" : "");
         let output = {extension:".lyl"};
         const blob = await convertTinkercadToLayerling(capture, name, {
           onProgress: progress,
@@ -403,7 +393,6 @@
         clearTimeout(elapsedTimer);
         updateElapsed();
         session.busy = false;
-        view.update.disabled = checking;
         view.close.disabled = false;
         view.cancel.hidden = true;
         view.cancel.style.display = "none";
@@ -412,6 +401,6 @@
     return session.promise;
   }
 
-  root.layerlingImportUI = { projectName, setDownload, checkUpdate };
+  root.layerlingImportUI = { projectName, setDownload };
   root.runLayerlingImport = runLayerlingImport;
 })(globalThis);

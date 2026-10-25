@@ -1018,7 +1018,25 @@ async function tinkercadJsonBlob(value, checkCancelled = () => {}) {
   return new Blob(blobs, {type:"application/json"});
 }
 
-async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}, onGeometryFailure = async () => false} = {}) {
+// Tinkercad EditorTestKitModel exposes these read-only getters. See
+// docs/tinkercad-selection.md for the inspected source and compatibility limits.
+function tinkercadSelectedIds() {
+  if (typeof testKit === "undefined") return null;
+  if (typeof testKit.getSelectionCount !== "function" || typeof testKit.getSelectedAt !== "function")
+    throw Error("Selection access is unavailable. Reload Tinkercad and reopen the bookmark, or choose Export whole design.");
+  const count = testKit.getSelectionCount(), ids = new Set();
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw Error("Tinkercad returned an unsupported selection count.");
+  for (let i = 0; i < count; i++) {
+    const node = testKit.getSelectedAt(i), id = node?.data?.versions_id;
+    if (node === testKit.sceneModel || !id || node.data.hasBeenRemoved || ids.has(String(id)))
+      throw Error("Select only 3D parts/groups and reopen the bookmark. The selection has unsupported or repeated items.");
+    ids.add(String(id));
+  }
+  return [...ids];
+}
+
+async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}, onGeometryFailure = async () => false, scope = "all", selectionIds} = {}) {
   const cancelled = () => {
     if (signal?.aborted) {
       const error = new Error("Import cancelled.");
@@ -1027,6 +1045,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
   };
   cancelled();
+  if (scope !== "all" && scope !== "selection") throw Error("Choose whole-design or selected-parts export.");
   if (lazy && download) throw new Error("Lazy capture is for direct conversion only.");
   const tools = window.llm?.tools?.get_design_data;
   if (typeof testKit === "undefined" || !tools) {
@@ -1038,7 +1057,33 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
   let shapes, notes = [];
-  const roots = [...testKit.sceneModel.children.values()];
+  let roots = [...testKit.sceneModel.children.values()];
+  const ids = scope === "selection" ? (selectionIds ?? tinkercadSelectedIds()) : null;
+  if (scope === "selection" && (!Array.isArray(ids) || !ids.length))
+    throw Error("Select parts/groups first (Shift-click for more), then reopen the bookmark. Selected-parts export is empty.");
+  const wanted = ids && new Set(ids), selectedRoots = [], found = new Set();
+  const sceneNodes = new Map(), seen = new Set();
+  function visit(node, selectedParent = false) {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    const id = String(node.data?.versions_id || node.versions_id || "");
+    if (id) {
+      if (wanted?.has(id)) {
+        if (found.has(id) || node.data?.hasBeenRemoved) throw Error("Selection changed. Reselect parts and reopen the bookmark.");
+        found.add(id);
+        if (!selectedParent) selectedRoots.push(node);
+        selectedParent = true;
+      }
+      sceneNodes.set(id, node);
+    }
+    const children = node.children;
+    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child, selectedParent);
+  }
+  if (wanted) {
+    visit(testKit.sceneModel);
+    if (found.size !== wanted.size) throw Error("Selection changed. Reselect parts and reopen the bookmark.");
+    roots = selectedRoots;
+  }
   const compactMetadata = lazy && roots.every(node =>
     node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
       typeof node.data.dataType?.get === "function" &&
@@ -1121,22 +1166,31 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     const payload = result?.content?.[0]?.json || result?.json || result;
     shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
     notes = payload?.notes || [];
+    if (wanted && Array.isArray(shapes)) {
+      const rootIds = new Set(roots.map(node => String(node.data?.versions_id || node.versions_id))), picked = new Map();
+      const pick = nodes => {
+        for (const node of nodes) {
+          const id = String(node.versions_id || "");
+          if (rootIds.has(id)) {
+            if (picked.has(id)) throw Error("Ambiguous selected shape identity; export stopped.");
+            picked.set(id, node);
+          } else pick(node.children || []);
+        }
+      };
+      pick(shapes);
+      if (picked.size !== rootIds.size) throw Error("Selected parts are missing from the capture; export stopped.");
+      shapes = [...rootIds].map(id => picked.get(id));
+    }
   }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  // Spatial notes have no supported part association; selected-parts export
+  // includes geometry subtrees only. Whole-design export retains every note.
+  if (wanted) notes = [];
   if (!Array.isArray(notes)) throw new Error("Tinkercad did not return a notes list.");
   notes = notes.map(note => ({uuid:note?.uuid, content:note?.content,
     position:note?.position && {x:note.position.x,y:note.position.y,z:note.position.z}}));
   cancelled();
-  const sceneNodes = new Map(), seen = new Set();
-  function visit(node) {
-    if (!node || seen.has(node)) return;
-    seen.add(node);
-    const id = node.data?.versions_id || node.versions_id;
-    if (id) sceneNodes.set(String(id), node);
-    const children = node.children;
-    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child);
-  }
-  visit(testKit.sceneModel);
+  if (!wanted) visit(testKit.sceneModel);
   const meshes = Object.create(null), meshParts = [], diagnostics = [], failures = [];
   let ignoreErrors = false;
   let captured = 0, triangles = 0;
@@ -1361,61 +1415,12 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
   }
   return exported;
 }
-/* Optional online loader. The self-contained bookmark remains available offline. */
-(function (root) {
-  "use strict";
-  root.layerlingLoadLatest = function () {
-    if (!["www.tinkercad.com","tinkercad.com"].includes(location.hostname) ||
-        !/^\/things\/[^/]+\/edit(?:\/|$)/.test(location.pathname)) {
-      alert("Open your design in the Tinkercad editor, then click this bookmark.");
-      return;
-    }
-    if (root.__layerlingImportSession?.busy) {
-      alert("Wait for the current export to finish, or cancel it before updating.");
-      return;
-    }
-    if (root.__layerlingLoaderActive) return;
-    root.__layerlingLoaderActive = true;
-    root.__layerlingRuntimeLoaded = false;
-    const script = document.createElement("script");
-    let done = false;
-    const finish = success => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      script.remove();
-      root.__layerlingLoaderActive = false;
-      if (success && root.__layerlingRuntimeLoaded && typeof root.runLayerlingImport === "function") void root.runLayerlingImport();
-      else alert("Online importer blocked or unavailable. Use the self-contained bookmark from https://taylormadearmy.github.io/tinkercad-layerling-importer/ .");
-    };
-    const timer = setTimeout(() => finish(false),15000);
-    script.referrerPolicy = "no-referrer";
-    script.src = "https://taylormadearmy.github.io/tinkercad-layerling-importer/importer.js?t=" + Date.now();
-    script.onload = () => finish(true);
-    script.onerror = () => finish(false);
-    try {document.head.append(script);} catch (_) {finish(false);}
-  };
-})(globalThis);
 /* Shared browser download controls and the Tinkercad bookmark entry point. */
 (function (root) {
   "use strict";
   const VERSION = "0.2.5";
-  const SITE = "https://taylormadearmy.github.io/tinkercad-layerling-importer/";
   root.layerlingImporterVersion = VERSION;
   const sizeLabel = bytes => bytes >= 1024**3 ? `${(bytes/1024**3).toFixed(2)} GiB` : `${(bytes/1024**2).toFixed(1)} MiB`;
-  async function checkUpdate(signal) {
-    if (typeof root.fetch !== "function") throw Error("Update check unavailable");
-    const response = await root.fetch(SITE+"version.json", {signal,credentials:"omit",referrerPolicy:"no-referrer",cache:"no-store"});
-    if (!response.ok) throw Error("Update check unavailable");
-    const text = await response.text();
-    if (text.length > 4096) throw Error("Invalid update response");
-    const version = JSON.parse(text).version;
-    if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw Error("Invalid update version");
-    const a = version.split(".").map(Number), b = VERSION.split(".").map(Number);
-    if (!a.every(Number.isSafeInteger)) throw Error("Invalid update version");
-    const diff = a.map((v,i)=>v-b[i]).find(v=>v!==0) || 0;
-    return {version,newer:diff>0};
-  }
   function projectName(title) {
     return (
       String(title || "")
@@ -1506,13 +1511,11 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     const title = document.createElement("strong");
     title.textContent = "Tinkercad to layerling";
     const version = document.createElement("p");
-    version.textContent = `Version ${VERSION}`;
-    const updateStatus = document.createElement("span");
-    const update = document.createElement("button");
-    update.type = "button"; update.textContent = "Check for updates";
+    version.textContent = `Version ${VERSION} · TinkerBarn selection preview`;
     const setup = document.createElement("a");
-    setup.href = SITE; setup.target = "_blank"; setup.rel = "noopener noreferrer";
-    setup.textContent = "Open setup page";
+    setup.href = "https://github.com/TinkerBarn/tinkercad-layerling-importer/tree/codex/export-selected-parts";
+    setup.target = "_blank"; setup.rel = "noopener noreferrer";
+    setup.textContent = "Fork setup instructions";
     const status = document.createElement("p");
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
@@ -1546,10 +1549,10 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     continueOnFailure.type = "button";
     continueOnFailure.textContent = "Continue without failed parts";
     failureChoices.append(stopOnFailure, continueOnFailure);
-    panel.append(title, cancel, close, version, updateStatus, update, setup, status, meter, counts, elapsed, link);
+    panel.append(title, cancel, close, version, setup, status, meter, counts, elapsed, link);
     panel.append(failureChoices);
     document.body.append(panel);
-    return { panel, status, link, close, cancel, meter, counts, elapsed, update, updateStatus, failureChoices, stopOnFailure, continueOnFailure };
+    return { panel, status, link, close, cancel, meter, counts, elapsed, failureChoices, stopOnFailure, continueOnFailure };
   }
 
   async function runLayerlingImport() {
@@ -1568,11 +1571,13 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       return;
     }
     previous?.dispose();
+    // Snapshot before focus or panel clicks can change Tinkercad's selection.
+    let selectionIds = null, selectionError = "";
+    try { selectionIds = tinkercadSelectedIds(); }
+    catch (error) { selectionError = String(error?.message || error); }
     const view = createPanel();
     const controller = new AbortController();
     let releaseDownload = () => {}, elapsedTimer;
-    const updateController = new AbortController();
-    let updateTimer;
     const session = {
       busy: true,
       disposed: false,
@@ -1582,8 +1587,6 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
         session.disposed = true;
         controller.abort();
         clearTimeout(elapsedTimer);
-        clearTimeout(updateTimer);
-        updateController.abort();
         releaseDownload();
         view.panel.remove();
         root.removeEventListener?.("pagehide", session.dispose);
@@ -1599,37 +1602,6 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       view.cancel.disabled = true;
       view.status.textContent = "Cancelling import…";
     });
-    let latest, checking = false;
-    const update = async () => {
-      if (checking) return;
-      if (latest?.newer) {
-        if (session.busy) return;
-        root.layerlingLoadLatest();
-        return;
-      }
-      checking = true;
-      view.update.disabled = true;
-      view.updateStatus.textContent = "Checking for updates… ";
-      const request = new AbortController();
-      const abort = () => request.abort();
-      updateController.signal.addEventListener("abort",abort,{once:true});
-      updateTimer = setTimeout(abort,5000);
-      try {
-        latest = await checkUpdate(request.signal);
-        if (session.disposed) return;
-        view.updateStatus.textContent = latest.newer ? `Version ${latest.version} available. ` : "No newer published version. ";
-        if (latest.newer) view.update.textContent = "Run latest version";
-      } catch (_) {
-        if (!session.disposed) view.updateStatus.textContent = "Update check unavailable. Use the setup page. ";
-      } finally {
-        checking = false;
-        clearTimeout(updateTimer);
-        updateController.signal.removeEventListener("abort",abort);
-        if (!session.disposed) view.update.disabled = Boolean(latest?.newer && session.busy);
-      }
-    };
-    view.update.addEventListener("click",()=>{void update();});
-    if (typeof root.fetch === "function") void update();
     const chooseOutput = plan => new Promise((resolve,reject) => {
       const choices = document.createElement("div");
       const warning = document.createElement("p");
@@ -1676,7 +1648,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
     trace.record({phase:"starting"}, "setup");
     let totalParts = 0, processedParts = 0;
-    const started = Date.now();
+    let started = Date.now();
     const updateElapsed = () => {
       const seconds = Math.floor((Date.now()-started)/1000);
       view.elapsed.textContent = `Elapsed: ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
@@ -1703,6 +1675,39 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
       if (session.disposed) throw Error("Import closed.");
       view.status.textContent = message;
     };
+    const chooseScope = () => new Promise((resolve, reject) => {
+      const choices = document.createElement("div"), hint = document.createElement("p");
+      hint.textContent = selectionError || (selectionIds === null
+        ? "After a first-run reload, reselect your parts and reopen the bookmark."
+        : selectionIds.length ? `${selectionIds.length} selected parts/groups. Selected groups include all their contents.`
+          : "No parts selected. Close, select parts/groups (Shift-click for more), then reopen this bookmark. Whole-design export is available.");
+      choices.append(hint);
+      const finish = scope => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        view.close.disabled = true;
+        view.meter.hidden = view.counts.hidden = view.elapsed.hidden = false;
+        resolve(scope);
+      };
+      const abort = () => {
+        choices.remove();
+        controller.signal.removeEventListener("abort", abort);
+        const error = Error("Import cancelled."); error.name = "AbortError"; reject(error);
+      };
+      for (const [label, scope] of [["Export whole design", "all"], ["Export selected parts", "selection"]]) {
+        const button = document.createElement("button");
+        button.type = "button"; button.textContent = label;
+        button.disabled = scope === "selection" && (Boolean(selectionError) || selectionIds?.length === 0);
+        button.addEventListener("click", () => finish(scope), {once:true});
+        choices.append(button);
+      }
+      view.meter.hidden = view.counts.hidden = view.elapsed.hidden = true;
+      view.close.disabled = false;
+      progress("Choose what to export.");
+      view.panel.append(choices);
+      controller.signal.addEventListener("abort", abort, {once:true});
+      if (controller.signal.aborted) abort();
+    });
     const choosePartialExport = failure => new Promise(resolve => {
       const finish = shouldContinue => {
         view.failureChoices.hidden = true;
@@ -1732,6 +1737,8 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     });
     session.promise = (async () => {
       try {
+        const scope = await chooseScope();
+        started = Date.now();
         progress("Capturing the open design…");
         await new Promise((resolve) => setTimeout(resolve, 0));
         if (session.disposed) return;
@@ -1743,6 +1750,8 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
           signal: controller.signal,
           onDiagnostic: diagnostic,
           onGeometryFailure: choosePartialExport,
+          scope,
+          selectionIds,
         });
         if (session.disposed) return;
         if (!capture) {
@@ -1752,7 +1761,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
           );
           return;
         }
-        const name = projectName(document.title);
+        const name = projectName(document.title) + (scope === "selection" ? " - selection" : "");
         let output = {extension:".lyl"};
         const blob = await convertTinkercadToLayerling(capture, name, {
           onProgress: progress,
@@ -1801,7 +1810,6 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
         clearTimeout(elapsedTimer);
         updateElapsed();
         session.busy = false;
-        view.update.disabled = checking;
         view.close.disabled = false;
         view.cancel.hidden = true;
         view.cancel.style.display = "none";
@@ -1810,7 +1818,6 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     return session.promise;
   }
 
-  root.layerlingImportUI = { projectName, setDownload, checkUpdate };
+  root.layerlingImportUI = { projectName, setDownload };
   root.runLayerlingImport = runLayerlingImport;
 })(globalThis);
-globalThis.__layerlingRuntimeLoaded = true;

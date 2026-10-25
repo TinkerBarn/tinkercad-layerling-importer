@@ -19,6 +19,7 @@
 </head>
 <body>
 <h1>Tinkercad to layerling</h1>
+<p><strong>TinkerBarn selection preview.</strong> This fork adds an explicit choice between the whole design and selected parts. Download this HTML file and open it locally to install the self-contained bookmark.</p>
 <p>Bring your Tinkercad design into layerling so you can keep editing it.</p>
 <p>Use a computer for these steps. Your original Tinkercad design stays unchanged.</p>
 <h2>Set up once</h2>
@@ -38,18 +39,16 @@
     Drag this button; clicking it on this page will not export a design.
   </li>
 </ol>
-<details><summary>Optional online bookmark: updates without replacing it</summary>
-<p>Experimental: drag <a class="mark" id="online-mark" href="{{ONLINE_BOOKMARK}}">Export to layerling (online)</a> to your bookmarks bar once. It loads the currently published exporter each time you use it. Internet access is required; Tinkercad may block external scripts. If it is blocked, use the self-contained blue bookmark above.</p>
-<p>Both bookmarks convert locally. The online bookmark requests code from this project's static website without sending design data.</p>
-</details>
 <h2>Export a design</h2>
 <ol>
   <li><strong>Open your design in Tinkercad.</strong> Click <strong>Edit</strong> if you are looking at its preview page. Wait until you can see the design in the editor.</li>
-  <li><strong>Click the saved Export to layerling bookmark</strong> on your browser’s bar. If Tinkercad reloads the first time, wait for your design to reappear, then click the bookmark again.</li>
+  <li><strong>Choose your parts, if needed.</strong> Select a part or group on the Tinkercad workplane. Use Shift-click to select more. A selected group includes all its children and Boolean operands.</li>
+  <li><strong>Click the saved Export to layerling bookmark</strong> on your browser’s bar, then choose <strong>Export whole design</strong> or <strong>Export selected parts</strong>. If Tinkercad reloads the first time, wait for your design to reappear, select your parts again and click the bookmark again.</li>
   <li><strong>Wait for “Project ready.”</strong> Your browser downloads a file ending in <code>.lyl</code>, usually into your <strong>Downloads</strong> folder. If nothing downloads, click <strong>Download .lyl again</strong> in the small export panel.</li>
   <li><strong>Open the file in layerling.</strong> On <a href="https://layerling.com/" target="_blank" rel="noopener">layerling’s start page</a>, click <strong>Open a design or import geometry</strong> and choose the downloaded <code>.lyl</code> file. You can also drag the file into the layerling window.</li>
 </ol>
 <p>For your next design, repeat only the steps under <strong>Export a design</strong>.</p>
+<p>The selection is captured when the bookmark opens. Close and reopen the panel to change it. If no supported selection is available, selected-parts export is disabled with instructions; it never falls back to the whole design. Selected-part files have <code>- selection</code> in their name, retain world positions and complete selected subtrees, and omit design-level spatial notes because those notes have no supported part association.</p>
 <p>Large designs offer <strong>Export smaller assemblies</strong> or <strong>Keep one project</strong>. The assemblies option downloads one ZIP: extract it, read README.txt, then open a numbered .lyl in layerling. Whole construction groups and original positions are retained. Files are checked against Layerling’s reader limits. An indivisible group that cannot fit is preserved in <code>needs-attention</code> as a <code>.preserved-project.zip</code>, not labelled as a ready-to-open project. Nothing is discarded. Extract the outer ZIP before opening a project; that transport ZIP may be larger than Layerling’s per-project limit. Combining separate projects in layerling has not yet been verified.</p>
 <details><summary>Something not working?</summary>
 <ul>
@@ -65,12 +64,12 @@
 <details><summary>Updates, privacy and limits</summary>
 <p>Version {{VERSION}} preview. To update an older bookmark, drag the button onto your bar again, then remove the old bookmark so you know which one to use. Already installed bookmarks do not update themselves.</p>
 <p>Your design is converted in your browser and is not uploaded by this tool. GitHub hosts this page and has its own hosting logs.</p>
-<p>The panel displays its version and checks this project’s static website for a newer published version. The check sends no design data. It may be unavailable offline or blocked by the editor. “Run latest version” loads the published code for this run; it does not replace a self-contained bookmark. Install the optional online bookmark once for future updates without dragging again.</p>
+<p>This fork preview uses manual bookmark replacement. It contains no online loader or automatic version check: loading the original project's hosted runtime would remove this branch's selection feature. Omitting those optional controls also keeps the self-contained bookmark below the browser's saved-URL size limit.</p>
 <p>Small progress and memory records are saved in this browser to help diagnose interrupted exports. These records contain no design geometry, design names or share links.</p>
 <p>Imported parts are editable meshes: you can move, resize and recolor them, but their original sketch settings are not recovered. This unofficial tool relies on Tinkercad editor features that can change. Large designs may need more memory.</p>
-<p>The shortcuts above explain how to show each browser’s bar; they do not mean the importer has been tested in every browser. See <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/blob/main/docs/browser-release-checks.md">compatibility and tested configurations</a>.</p>
+<p>The shortcuts above explain how to show each browser’s bar; they do not mean the importer has been tested in every browser. This selection preview has not been export-tested. See the <a href="https://github.com/TinkerBarn/tinkercad-layerling-importer/blob/codex/export-selected-parts/docs/tinkercad-selection.md">selection API notes and limitations</a>.</p>
 </details>
-<p><a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/releases/download/v{{VERSION}}/tinkercad-layerling-browser.zip">Download the offline edition</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer">Source and instructions</a> · <a href="https://github.com/taylormadearmy/tinkercad-layerling-importer/issues/new?template=bug.yml">Report a problem</a></p>
+<p><a href="https://github.com/TinkerBarn/tinkercad-layerling-importer/tree/codex/export-selected-parts">Fork source and instructions</a></p>
 <details><summary>Convert an earlier JSON export</summary>
 <p>This optional section is for designs you have already saved as a JSON export using this tool. For a design open in Tinkercad, use the bookmark steps above.</p>
 <p><label>Exported JSON <input id="source-file" type="file" accept="application/json,.json"></label></p>
@@ -135,7 +134,25 @@ async function tinkercadJsonBlob(value, checkCancelled = () => {}) {
   return new Blob(blobs, {type:"application/json"});
 }
 
-async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}, onGeometryFailure = async () => false} = {}) {
+// Tinkercad EditorTestKitModel exposes these read-only getters. See
+// docs/tinkercad-selection.md for the inspected source and compatibility limits.
+function tinkercadSelectedIds() {
+  if (typeof testKit === "undefined") return null;
+  if (typeof testKit.getSelectionCount !== "function" || typeof testKit.getSelectedAt !== "function")
+    throw Error("Selection access is unavailable. Reload Tinkercad and reopen the bookmark, or choose Export whole design.");
+  const count = testKit.getSelectionCount(), ids = new Set();
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw Error("Tinkercad returned an unsupported selection count.");
+  for (let i = 0; i < count; i++) {
+    const node = testKit.getSelectedAt(i), id = node?.data?.versions_id;
+    if (node === testKit.sceneModel || !id || node.data.hasBeenRemoved || ids.has(String(id)))
+      throw Error("Select only 3D parts/groups and reopen the bookmark. The selection has unsupported or repeated items.");
+    ids.add(String(id));
+  }
+  return [...ids];
+}
+
+async function exportTinkercadDesign({download = true, onProgress = () => {}, signal, lazy = false, onDiagnostic = () => {}, onGeometryFailure = async () => false, scope = "all", selectionIds} = {}) {
   const cancelled = () => {
     if (signal?.aborted) {
       const error = new Error("Import cancelled.");
@@ -144,6 +161,7 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     }
   };
   cancelled();
+  if (scope !== "all" && scope !== "selection") throw Error("Choose whole-design or selected-parts export.");
   if (lazy && download) throw new Error("Lazy capture is for direct conversion only.");
   const tools = window.llm?.tools?.get_design_data;
   if (typeof testKit === "undefined" || !tools) {
@@ -155,7 +173,33 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     throw new Error("Enable Tinkercad testkit before exporting. No design data was changed.");
   }
   let shapes, notes = [];
-  const roots = [...testKit.sceneModel.children.values()];
+  let roots = [...testKit.sceneModel.children.values()];
+  const ids = scope === "selection" ? (selectionIds ?? tinkercadSelectedIds()) : null;
+  if (scope === "selection" && (!Array.isArray(ids) || !ids.length))
+    throw Error("Select parts/groups first (Shift-click for more), then reopen the bookmark. Selected-parts export is empty.");
+  const wanted = ids && new Set(ids), selectedRoots = [], found = new Set();
+  const sceneNodes = new Map(), seen = new Set();
+  function visit(node, selectedParent = false) {
+    if (!node || seen.has(node)) return;
+    seen.add(node);
+    const id = String(node.data?.versions_id || node.versions_id || "");
+    if (id) {
+      if (wanted?.has(id)) {
+        if (found.has(id) || node.data?.hasBeenRemoved) throw Error("Selection changed. Reselect parts and reopen the bookmark.");
+        found.add(id);
+        if (!selectedParent) selectedRoots.push(node);
+        selectedParent = true;
+      }
+      sceneNodes.set(id, node);
+    }
+    const children = node.children;
+    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child, selectedParent);
+  }
+  if (wanted) {
+    visit(testKit.sceneModel);
+    if (found.size !== wanted.size) throw Error("Selection changed. Reselect parts and reopen the bookmark.");
+    roots = selectedRoots;
+  }
   const compactMetadata = lazy && roots.every(node =>
     node?.data?.hasBeenRemoved || (node?.data?.versions_id &&
       typeof node.data.dataType?.get === "function" &&
@@ -238,22 +282,31 @@ async function exportTinkercadDesign({download = true, onProgress = () => {}, si
     const payload = result?.content?.[0]?.json || result?.json || result;
     shapes = payload?.shapes || (Array.isArray(payload) ? payload : null);
     notes = payload?.notes || [];
+    if (wanted && Array.isArray(shapes)) {
+      const rootIds = new Set(roots.map(node => String(node.data?.versions_id || node.versions_id))), picked = new Map();
+      const pick = nodes => {
+        for (const node of nodes) {
+          const id = String(node.versions_id || "");
+          if (rootIds.has(id)) {
+            if (picked.has(id)) throw Error("Ambiguous selected shape identity; export stopped.");
+            picked.set(id, node);
+          } else pick(node.children || []);
+        }
+      };
+      pick(shapes);
+      if (picked.size !== rootIds.size) throw Error("Selected parts are missing from the capture; export stopped.");
+      shapes = [...rootIds].map(id => picked.get(id));
+    }
   }
   if (!Array.isArray(shapes)) throw new Error("Tinkercad did not return a shape tree.");
+  // Spatial notes have no supported part association; selected-parts export
+  // includes geometry subtrees only. Whole-design export retains every note.
+  if (wanted) notes = [];
   if (!Array.isArray(notes)) throw new Error("Tinkercad did not return a notes list.");
   notes = notes.map(note => ({uuid:note?.uuid, content:note?.content,
     position:note?.position && {x:note.position.x,y:note.position.y,z:note.position.z}}));
   cancelled();
-  const sceneNodes = new Map(), seen = new Set();
-  function visit(node) {
-    if (!node || seen.has(node)) return;
-    seen.add(node);
-    const id = node.data?.versions_id || node.versions_id;
-    if (id) sceneNodes.set(String(id), node);
-    const children = node.children;
-    for (const child of (children?.values ? [...children.values()] : Array.isArray(children) ? children : [])) visit(child);
-  }
-  visit(testKit.sceneModel);
+  if (!wanted) visit(testKit.sceneModel);
   const meshes = Object.create(null), meshParts = [], diagnostics = [], failures = [];
   let ignoreErrors = false;
   let captured = 0, triangles = 0;
